@@ -1,0 +1,196 @@
+'use client'
+
+import { Market } from '@/lib/polymarket-api'
+import { formatCurrency, formatDate, formatDateTime, formatTimeUntil, getTimeUntilColor } from '@/lib/utils'
+import { useState } from 'react'
+
+export type TableSortField = 'question' | 'category' | 'yesPrice' | 'noPrice' | 'volume' | 'liquidity' | 'volume24h' | 'endDate' | 'daysUntil' | 'status'
+export type TableSortOrder = 'asc' | 'desc'
+
+interface MarketTableProps {
+  markets: Market[]
+  onSort?: (field: TableSortField, order: TableSortOrder) => void
+  sortField?: TableSortField
+  sortOrder?: TableSortOrder
+}
+
+export default function MarketTable({ markets, onSort, sortField, sortOrder }: MarketTableProps) {
+  const [localSortField, setLocalSortField] = useState<TableSortField>('endDate')
+  const [localSortOrder, setLocalSortOrder] = useState<TableSortOrder>('asc')
+
+  const currentSortField = sortField || localSortField
+  const currentSortOrder = sortOrder || localSortOrder
+
+  const handleSort = (field: TableSortField) => {
+    const newOrder = currentSortField === field && currentSortOrder === 'asc' ? 'desc' : 'asc'
+    if (onSort) {
+      onSort(field, newOrder)
+    } else {
+      setLocalSortField(field)
+      setLocalSortOrder(newOrder)
+    }
+  }
+
+  const SortIcon = ({ field }: { field: TableSortField }) => {
+    if (currentSortField !== field) {
+      return <span className="text-gray-500 ml-1">↕</span>
+    }
+    return <span className="text-polymarket-blue ml-1">{currentSortOrder === 'asc' ? '↑' : '↓'}</span>
+  }
+
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full border-collapse">
+        <thead>
+          <tr className="bg-polymarket-gray border-b border-gray-700">
+            <th 
+              className="text-left p-4 text-sm font-semibold text-gray-300 cursor-pointer hover:bg-gray-700 transition-colors"
+              onClick={() => handleSort('question')}
+            >
+              Question <SortIcon field="question" />
+            </th>
+            <th 
+              className="text-left p-4 text-sm font-semibold text-gray-300 cursor-pointer hover:bg-gray-700 transition-colors"
+              onClick={() => handleSort('category')}
+            >
+              Category <SortIcon field="category" />
+            </th>
+            <th 
+              className="text-right p-4 text-sm font-semibold text-gray-300 cursor-pointer hover:bg-gray-700 transition-colors"
+              onClick={() => handleSort('yesPrice')}
+            >
+              YES Price <SortIcon field="yesPrice" />
+            </th>
+            <th 
+              className="text-right p-4 text-sm font-semibold text-gray-300 cursor-pointer hover:bg-gray-700 transition-colors"
+              onClick={() => handleSort('noPrice')}
+            >
+              NO Price <SortIcon field="noPrice" />
+            </th>
+            <th 
+              className="text-right p-4 text-sm font-semibold text-gray-300 cursor-pointer hover:bg-gray-700 transition-colors"
+              onClick={() => handleSort('volume')}
+            >
+              Volume <SortIcon field="volume" />
+            </th>
+            <th 
+              className="text-right p-4 text-sm font-semibold text-gray-300 cursor-pointer hover:bg-gray-700 transition-colors"
+              onClick={() => handleSort('liquidity')}
+            >
+              Liquidity <SortIcon field="liquidity" />
+            </th>
+            <th 
+              className="text-right p-4 text-sm font-semibold text-gray-300 cursor-pointer hover:bg-gray-700 transition-colors"
+              onClick={() => handleSort('volume24h')}
+            >
+              24h Volume <SortIcon field="volume24h" />
+            </th>
+            <th 
+              className="text-left p-4 text-sm font-semibold text-gray-300 cursor-pointer hover:bg-gray-700 transition-colors"
+              onClick={() => handleSort('endDate')}
+            >
+              Resolution Date <SortIcon field="endDate" />
+            </th>
+            <th 
+              className="text-right p-4 text-sm font-semibold text-gray-300 cursor-pointer hover:bg-gray-700 transition-colors"
+              onClick={() => handleSort('daysUntil')}
+            >
+              Time Until <SortIcon field="daysUntil" />
+            </th>
+            <th 
+              className="text-center p-4 text-sm font-semibold text-gray-300 cursor-pointer hover:bg-gray-700 transition-colors"
+              onClick={() => handleSort('status')}
+            >
+              Status <SortIcon field="status" />
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          {markets.map((market, index) => {
+            const yesPrice = market.outcomePrices?.[0] ? parseFloat(market.outcomePrices[0]) : 0.5
+            const noPrice = market.outcomePrices?.[1] ? parseFloat(market.outcomePrices[1]) : 1 - yesPrice
+            const statusColor = market.closed
+              ? 'bg-gray-500'
+              : market.finalized
+              ? 'bg-green-500'
+              : 'bg-blue-500'
+            const statusText = market.closed
+              ? 'Closed'
+              : market.finalized
+              ? 'Finalized'
+              : 'Active'
+
+            return (
+              <tr
+                key={market.id}
+                className={`border-b border-gray-800 hover:bg-polymarket-gray/50 transition-colors ${
+                  index % 2 === 0 ? 'bg-gray-900/30' : ''
+                }`}
+              >
+                <td className="p-4">
+                  <div className="max-w-xs">
+                    <a
+                      href={`https://polymarket.com/event/${market.eventSlug || market.slug}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-white font-medium line-clamp-2 hover:text-polymarket-blue hover:underline transition-colors cursor-pointer"
+                      onClick={(e) => {
+                        e.preventDefault()
+                        window.open(`https://polymarket.com/event/${market.eventSlug || market.slug}`, '_blank', 'noopener,noreferrer')
+                      }}
+                    >
+                      {market.question}
+                    </a>
+                    {market.description && (
+                      <p className="text-xs text-gray-400 mt-1 line-clamp-1">{market.description}</p>
+                    )}
+                  </div>
+                </td>
+                <td className="p-4">
+                  <span className="text-sm text-gray-300">
+                    {(market.category && market.category.trim()) ? market.category : 'N/A'}
+                  </span>
+                </td>
+                <td className="p-4 text-right">
+                  <span className={`font-semibold ${yesPrice > 0.5 ? 'text-green-400' : 'text-gray-300'}`}>
+                    {(yesPrice * 100).toFixed(2)}%
+                  </span>
+                </td>
+                <td className="p-4 text-right">
+                  <span className={`font-semibold ${noPrice > 0.5 ? 'text-red-400' : 'text-gray-300'}`}>
+                    {(noPrice * 100).toFixed(2)}%
+                  </span>
+                </td>
+                <td className="p-4 text-right">
+                  <span className="text-sm text-gray-300">{formatCurrency(market.volumeNum)}</span>
+                </td>
+                <td className="p-4 text-right">
+                  <span className="text-sm text-gray-300">{formatCurrency(market.liquidityNum)}</span>
+                </td>
+                <td className="p-4 text-right">
+                  <span className="text-sm text-gray-300">
+                    {market.volume24hNum ? formatCurrency(market.volume24hNum) : 'N/A'}
+                  </span>
+                </td>
+                <td className="p-4">
+                  <span className="text-sm text-gray-300">{formatDateTime(market.endDate)}</span>
+                </td>
+                <td className="p-4 text-right">
+                  <span className={`text-sm font-semibold ${market.endDate ? getTimeUntilColor(market.endDate) : 'text-gray-400'}`}>
+                    {market.endDate ? formatTimeUntil(market.endDate) : 'N/A'}
+                  </span>
+                </td>
+                <td className="p-4 text-center">
+                  <span className={`px-2 py-1 rounded text-xs font-semibold ${statusColor}`}>
+                    {statusText}
+                  </span>
+                </td>
+              </tr>
+            )
+          })}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+

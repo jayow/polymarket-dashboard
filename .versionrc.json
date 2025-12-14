@@ -1,0 +1,16 @@
+{
+  "types": [
+    { "type": "feat", "section": "Added" },
+    { "type": "fix", "section": "Fixed" },
+    { "type": "perf", "section": "Performance" },
+    { "type": "refactor", "section": "Changed" },
+    { "type": "docs", "section": "Documentation" },
+    { "type": "style", "section": "Style" },
+    { "type": "chore", "section": "Maintenance" },
+    { "type": "build", "section": "Build System" },
+    { "type": "ci", "section": "CI/CD" }
+  ],
+  "commitUrlFormat": "https://github.com/yourusername/polymarket-dashboard/commit/{{hash}}",
+  "compareUrlFormat": "https://github.com/yourusername/polymarket-dashboard/compare/{{previousTag}}...{{currentTag}}"
+}
+
