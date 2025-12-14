@@ -40,8 +40,11 @@ export default function Home() {
       setLoading(true)
       setError(null)
       
-      // Clear cache if requested
+      // Clear cache if requested (use correct cache keys)
       if (clearCache && typeof window !== 'undefined') {
+        localStorage.removeItem('polymarket_events_cache')
+        localStorage.removeItem('polymarket_events_cache_timestamp')
+        // Also clear old cache keys for backward compatibility
         localStorage.removeItem('polymarket_markets_cache')
         localStorage.removeItem('polymarket_markets_cache_timestamp')
         console.log('Cache cleared, fetching fresh data')

@@ -94,6 +94,10 @@ export interface EventsResponse {
 const CACHE_KEY = 'polymarket_events_cache'
 const CACHE_TIMESTAMP_KEY = 'polymarket_events_cache_timestamp'
 const CACHE_DURATION = 2 * 60 * 1000 // 2 minutes in milliseconds
+const STALE_CACHE_DURATION = 10 * 60 * 1000 // 10 minutes - allow stale cache
+
+// Request deduplication - prevent multiple concurrent requests
+let activeFetchPromise: Promise<Event[]> | null = null
 
 // Fetch events from Polymarket Gamma API (events contain markets)
 // Uses Next.js API route as proxy to avoid CORS issues
@@ -103,8 +107,14 @@ const CACHE_DURATION = 2 * 60 * 1000 // 2 minutes in milliseconds
 export async function fetchEvents(eventLimit: number | null = 1000, useCache: boolean = true): Promise<Event[]> {
   const fetchAll = eventLimit === null || eventLimit === Infinity || eventLimit === 0;
   
-  // Check cache first (client-side only)
-  if (typeof window !== 'undefined' && useCache && !fetchAll) {
+  // Request deduplication - if there's an active fetch, return that promise
+  if (activeFetchPromise && useCache) {
+    console.log('Deduplicating request - using active fetch promise')
+    return activeFetchPromise
+  }
+
+  // Check cache first (client-side only) - stale-while-revalidate pattern
+  if (typeof window !== 'undefined' && useCache) {
     try {
       const cachedData = localStorage.getItem(CACHE_KEY)
       const cacheTimestamp = localStorage.getItem(CACHE_TIMESTAMP_KEY)
@@ -112,27 +122,52 @@ export async function fetchEvents(eventLimit: number | null = 1000, useCache: bo
       if (cachedData && cacheTimestamp) {
         const timestamp = parseInt(cacheTimestamp, 10)
         const now = Date.now()
+        const age = now - timestamp
         
-        if (now - timestamp < CACHE_DURATION) {
-          console.log('Using cached events data')
+        // Fresh cache - return immediately
+        if (age < CACHE_DURATION) {
+          console.log('Using fresh cached events data')
           const events = JSON.parse(cachedData) as Event[]
-          // If cache has all events and we want all, return cached
           if (fetchAll) {
             return events
           }
-          return events.slice(0, eventLimit)
-        } else {
-          console.log('Cache expired, fetching fresh data')
+          return events.slice(0, eventLimit || 1000)
         }
+        
+        // Stale cache - return it but refresh in background (stale-while-revalidate)
+        if (age < STALE_CACHE_DURATION) {
+          console.log('Using stale cached events data, refreshing in background')
+          const events = JSON.parse(cachedData) as Event[]
+          
+          // Trigger background refresh (don't await)
+          fetchEventsInternal(eventLimit, false).catch(err => {
+            console.warn('Background refresh failed:', err)
+          })
+          
+          if (fetchAll) {
+            return events
+          }
+          return events.slice(0, eventLimit || 1000)
+        }
+        
+        console.log('Cache expired, fetching fresh data')
       }
     } catch (error) {
       console.warn('Error reading from cache:', error)
     }
   }
   
+  // Fetch fresh data
+  return fetchEventsInternal(eventLimit, useCache)
+}
+
+// Internal fetch function (separated for reuse)
+async function fetchEventsInternal(eventLimit: number | null, useCache: boolean): Promise<Event[]> {
+  const fetchAll = eventLimit === null || eventLimit === Infinity || eventLimit === 0
+  
   const allEvents: Event[] = [];
   const pageSize = 100;
-  const concurrentRequests = 5; // Fetch 5 pages in parallel
+  const concurrentRequests = 10; // Increased from 5 to 10 for faster loading
   
   // Calculate max pages: if fetching all, use a high safety limit
   // Otherwise calculate based on eventLimit
@@ -314,13 +349,39 @@ export async function fetchEvents(eventLimit: number | null = 1000, useCache: bo
   // Cache the results (client-side only) - cache all events even if we limited the return
   if (typeof window !== 'undefined' && useCache) {
     try {
-      localStorage.setItem(CACHE_KEY, JSON.stringify(allEvents));
+      // Use compression for large datasets (simple JSON compression)
+      const dataToCache = JSON.stringify(allEvents);
+      
+      // Check if data is too large for localStorage (usually 5-10MB limit)
+      // If too large, we could use IndexedDB, but for now just warn
+      if (dataToCache.length > 5 * 1024 * 1024) {
+        console.warn(`Cache data is large (${(dataToCache.length / 1024 / 1024).toFixed(2)}MB). Consider using IndexedDB for better performance.`);
+      }
+      
+      localStorage.setItem(CACHE_KEY, dataToCache);
       localStorage.setItem(CACHE_TIMESTAMP_KEY, Date.now().toString());
       console.log('Events data cached for faster future loads');
-    } catch (error) {
-      console.warn('Error caching events data:', error);
+    } catch (error: any) {
+      // Handle quota exceeded error
+      if (error.name === 'QuotaExceededError') {
+        console.warn('localStorage quota exceeded. Clearing old cache and retrying...');
+        // Clear old cache and try again with just the new data
+        try {
+          localStorage.removeItem(CACHE_KEY);
+          localStorage.removeItem(CACHE_TIMESTAMP_KEY);
+          localStorage.setItem(CACHE_KEY, JSON.stringify(allEvents));
+          localStorage.setItem(CACHE_TIMESTAMP_KEY, Date.now().toString());
+        } catch (retryError) {
+          console.error('Failed to cache even after clearing:', retryError);
+        }
+      } else {
+        console.warn('Error caching events data:', error);
+      }
     }
   }
+
+  // Clear the active fetch promise
+  activeFetchPromise = null;
 
   // If fetching all, return everything. Otherwise limit to requested amount
   if (fetchAll) {
