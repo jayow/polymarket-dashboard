@@ -91,17 +91,37 @@ export default function Home() {
     }
   }
 
-  // Extract unique categories (normalized for consistency)
+  // Extract unique categories from all tags (support multi-category)
   const categories = useMemo(() => {
     const cats = new Set<string>()
     allMarkets.forEach(m => {
+      // Add primary category
       const cat = m.category?.trim()
       if (cat && cat.length > 0 && cat !== 'NONE' && cat.toLowerCase() !== 'none') {
-        cats.add(cat) // Keep original case for display
+        cats.add(cat)
+      }
+      // Add all tags (for multi-category support)
+      if (m.tags && Array.isArray(m.tags)) {
+        m.tags.forEach(tag => {
+          // Handle both string tags and object tags
+          let tagLabel: string | undefined
+          if (typeof tag === 'string') {
+            tagLabel = tag.trim()
+          } else if (typeof tag === 'object' && tag !== null && 'label' in tag) {
+            tagLabel = String(tag.label).trim()
+          } else {
+            // Skip non-string, non-object tags
+            return
+          }
+          
+          if (tagLabel && tagLabel.length > 0 && tagLabel !== 'NONE' && tagLabel.toLowerCase() !== 'none') {
+            cats.add(tagLabel)
+          }
+        })
       }
     })
     const sorted = Array.from(cats).sort()
-    console.log(`Found ${sorted.length} unique categories:`, sorted.slice(0, 20))
+    console.log(`Found ${sorted.length} unique categories/tags:`, sorted.slice(0, 20))
     return sorted
   }, [allMarkets])
 
@@ -138,53 +158,135 @@ export default function Home() {
       filtered = filtered.filter(m => m.active && !m.closed && !m.finalized)
     }
 
-    // Filter by category (exact match, case-sensitive, trimmed)
+    // Filter by category - check both primary category AND all tags (multi-category support)
     if (selectedCategory && selectedCategory.trim()) {
       const beforeCount = filtered.length
       const normalizedFilter = selectedCategory.trim()
       
-      // Filter markets - only include markets that match the selected category exactly
+      let matchedByCategory = 0
+      let matchedByTags = 0
+      
+      // Filter markets - include if primary category OR any tag matches
       filtered = filtered.filter(m => {
+        // Check primary category
         const marketCategory = (m.category || '').trim()
-        return marketCategory === normalizedFilter
-      })
-      
-      // Debug: Check for category mismatches in filtered results
-      const categoriesInResults = new Set<string>()
-      const sampleMismatches: Array<{question: string, category: string}> = []
-      
-      filtered.forEach(m => {
-        const cat = (m.category || '').trim()
-        if (cat) {
-          categoriesInResults.add(cat)
-          // Collect mismatches for debugging
-          if (cat !== normalizedFilter && sampleMismatches.length < 10) {
-            sampleMismatches.push({
-              question: m.question.substring(0, 60),
-              category: cat
-            })
+        if (marketCategory === normalizedFilter) {
+          matchedByCategory++
+          return true
+        }
+        
+        // Check all tags (multi-category support)
+        if (m.tags && Array.isArray(m.tags)) {
+          const hasMatchingTag = m.tags.some(tag => {
+            // Handle both string tags and object tags
+            let tagLabel: string | undefined
+            if (typeof tag === 'string') {
+              tagLabel = tag.trim()
+            } else if (typeof tag === 'object' && tag !== null && 'label' in tag) {
+              tagLabel = String(tag.label).trim()
+            }
+            return tagLabel === normalizedFilter
+          })
+          
+          if (hasMatchingTag) {
+            matchedByTags++
+            return true
           }
         }
+        
+        return false
       })
       
       console.log(`Category filter "${normalizedFilter}": ${beforeCount} → ${filtered.length} markets`)
+      console.log(`  - Matched by primary category: ${matchedByCategory}`)
+      console.log(`  - Matched by tags only: ${matchedByTags}`)
       
-      // CRITICAL: Warn if filtered results contain unexpected categories
-      const unexpected = Array.from(categoriesInResults).filter(cat => cat !== normalizedFilter)
-      if (unexpected.length > 0) {
-        console.error(`❌ CRITICAL: Category filter is broken! Found ${unexpected.length} unexpected categories:`, unexpected)
-        console.error(`   Expected ONLY: "${normalizedFilter}"`)
-        console.error(`   But found:`, Array.from(categoriesInResults))
-        console.error(`   Sample mismatches:`, sampleMismatches)
+      // Debug: Check what categories/tags are in the filtered results
+      const categoriesInResults = new Set<string>()
+      const tagsInResults = new Set<string>()
+      
+      filtered.forEach(m => {
+        // Track primary categories
+        const cat = (m.category || '').trim()
+        if (cat) {
+          categoriesInResults.add(cat)
+        }
+        // Track all tags
+        if (m.tags && Array.isArray(m.tags)) {
+          m.tags.forEach(tag => {
+            let tagLabel: string | undefined
+            if (typeof tag === 'string') {
+              tagLabel = tag.trim()
+            } else if (typeof tag === 'object' && tag !== null && 'label' in tag) {
+              tagLabel = String(tag.label).trim()
+            }
+            if (tagLabel) {
+              tagsInResults.add(tagLabel)
+            }
+          })
+        }
+      })
+      
+      // Verify that all filtered markets actually match the filter (by category OR tags)
+      const invalidMarkets = filtered.filter(m => {
+        const marketCategory = (m.category || '').trim()
+        if (marketCategory === normalizedFilter) {
+          return false // Valid - matches by primary category
+        }
         
-        // FIX: Re-filter to remove mismatches (safety check)
+        // Check if any tag matches
+        if (m.tags && Array.isArray(m.tags)) {
+          const hasMatchingTag = m.tags.some(tag => {
+            let tagLabel: string | undefined
+            if (typeof tag === 'string') {
+              tagLabel = tag.trim()
+            } else if (typeof tag === 'object' && tag !== null && 'label' in tag) {
+              tagLabel = String(tag.label).trim()
+            }
+            return tagLabel === normalizedFilter
+          })
+          return !hasMatchingTag // Invalid if no tag matches
+        }
+        
+        return true // Invalid - no category or tag match
+      })
+      
+      if (invalidMarkets.length > 0) {
+        console.error(`❌ CRITICAL: Category filter is broken! Found ${invalidMarkets.length} markets that don't match filter "${normalizedFilter}"`)
+        console.error(`   Sample invalid markets:`, invalidMarkets.slice(0, 5).map(m => ({
+          question: m.question.substring(0, 60),
+          category: m.category,
+          tags: m.tags
+        })))
+        
+        // FIX: Remove invalid markets
         filtered = filtered.filter(m => {
           const marketCategory = (m.category || '').trim()
-          return marketCategory === normalizedFilter
+          if (marketCategory === normalizedFilter) {
+            return true
+          }
+          if (m.tags && Array.isArray(m.tags)) {
+            return m.tags.some(tag => {
+              let tagLabel: string | undefined
+              if (typeof tag === 'string') {
+                tagLabel = tag.trim()
+              } else if (typeof tag === 'object' && tag !== null && 'label' in tag) {
+                tagLabel = String(tag.label).trim()
+              }
+              return tagLabel === normalizedFilter
+            })
+          }
+          return false
         })
-        console.warn(`   Fixed: Re-filtered to ${filtered.length} markets with correct category`)
-      } else if (filtered.length > 0) {
-        console.log(`✅ Category filter working correctly - all ${filtered.length} markets have category "${normalizedFilter}"`)
+        console.warn(`   Fixed: Re-filtered to ${filtered.length} valid markets`)
+      } else {
+        console.log(`✅ Category filter working correctly - all ${filtered.length} markets match "${normalizedFilter}" (by category or tags)`)
+        if (categoriesInResults.size > 0) {
+          console.log(`   Primary categories in results:`, Array.from(categoriesInResults).slice(0, 10))
+        }
+        if (tagsInResults.has(normalizedFilter)) {
+          console.log(`   ✓ Filter "${normalizedFilter}" found in tags`)
+        }
       }
     }
 

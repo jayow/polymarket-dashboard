@@ -131,9 +131,20 @@ export default function MarketCard({ market }: MarketCardProps) {
 
         <div className="flex items-center justify-between text-xs text-gray-400 pt-2 border-t border-gray-800">
           <div className="flex items-center gap-4">
-            {(market.category && market.category.trim()) && (
-              <span className="px-2 py-1 bg-gray-800 rounded text-xs">{market.category}</span>
-            )}
+            <div className="flex flex-wrap gap-1">
+              {/* Primary category */}
+              {market.category && market.category.trim() && (
+                <span className="px-2 py-1 bg-blue-900/30 text-blue-300 rounded text-xs">{market.category}</span>
+              )}
+              {/* Additional tags */}
+              {market.tags && market.tags.length > 0 && market.tags.slice(1).map((tag, idx) => {
+                // Handle both string tags and object tags
+                const tagLabel = typeof tag === 'string' ? tag : (typeof tag === 'object' && tag !== null && 'label' in tag ? String(tag.label) : String(tag))
+                return (
+                  <span key={idx} className="px-2 py-1 bg-gray-800 text-gray-300 rounded text-xs">{tagLabel}</span>
+                )
+              })}
+            </div>
             {market.endDate && (
               <span className={getTimeUntilColor(market.endDate)}>
                 {formatTimeUntil(market.endDate)}

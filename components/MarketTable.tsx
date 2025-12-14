@@ -165,9 +165,27 @@ export default function MarketTable({ markets, onSort, sortField, sortOrder }: M
                   </div>
                 </td>
                 <td className="p-4">
-                  <span className="text-sm text-gray-300">
-                    {(market.category && market.category.trim()) ? market.category : 'N/A'}
-                  </span>
+                  <div className="flex flex-wrap gap-1">
+                    {/* Primary category */}
+                    {market.category && market.category.trim() && (
+                      <span className="px-2 py-1 bg-blue-900/30 text-blue-300 text-xs rounded">
+                        {market.category}
+                      </span>
+                    )}
+                    {/* Additional tags */}
+                    {market.tags && market.tags.length > 0 && market.tags.slice(1).map((tag, idx) => {
+                      // Handle both string tags and object tags
+                      const tagLabel = typeof tag === 'string' ? tag : (typeof tag === 'object' && tag !== null && 'label' in tag ? String(tag.label) : String(tag))
+                      return (
+                        <span key={idx} className="px-2 py-1 bg-gray-700 text-gray-300 text-xs rounded">
+                          {tagLabel}
+                        </span>
+                      )
+                    })}
+                    {(!market.category || !market.category.trim()) && (!market.tags || market.tags.length === 0) && (
+                      <span className="text-sm text-gray-500">N/A</span>
+                    )}
+                  </div>
                 </td>
                 <td className="p-4 text-right">
                   <span className={`font-semibold ${yesPrice > 0.5 ? 'text-green-400' : 'text-gray-300'}`}>

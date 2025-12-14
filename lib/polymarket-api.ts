@@ -236,34 +236,29 @@ async function fetchEventsInternal(eventLimit: number | null, useCache: boolean)
               return;
             }
             
-            // Extract category from tags - use first tag that has a label
-            // Note: Events can have multiple tags, but we use the first one as the primary category
-            let eventCategory = null
+            // Extract all tags from event - support multiple categories
+            const eventTags: string[] = []
             if (event.tags && Array.isArray(event.tags) && event.tags.length > 0) {
-              // Find first tag with a valid label
               for (const tag of event.tags) {
                 if (typeof tag === 'object' && tag.label) {
                   const label = tag.label.trim()
                   if (label && label.length > 0 && label !== 'NONE' && label.toLowerCase() !== 'none') {
-                    eventCategory = label
-                    break
+                    eventTags.push(label)
                   }
                 } else if (typeof tag === 'string' && tag.trim()) {
                   const label = tag.trim()
                   if (label && label !== 'NONE' && label.toLowerCase() !== 'none') {
-                    eventCategory = label
-                    break
+                    eventTags.push(label)
                   }
                 }
               }
             }
-            if (!eventCategory) {
-              eventCategory = event.category || null
-            }
+            // Primary category is the first tag (for backward compatibility)
+            const eventCategory = eventTags.length > 0 ? eventTags[0] : (event.category || null)
             
             // Transform markets within this event
             const transformedMarkets: Market[] = (event.markets || []).map((market: any) => {
-              return transformSingleMarket(market, event);
+              return transformSingleMarket(market, event, eventTags);
             });
             
             // Create event object with all its markets
@@ -402,7 +397,8 @@ async function fetchEventsInternal(eventLimit: number | null, useCache: boolean)
 }
 
 // Helper function to transform a single market with event context
-function transformSingleMarket(market: any, event: any): Market {
+// eventTags: pre-extracted tags array to avoid re-extraction
+function transformSingleMarket(market: any, event: any, eventTags?: string[]): Market {
   // Parse endDate
   const endDate = market.endDate || market.endDateIso || market.end_date_iso || market.endDateISO || '';
   const endDateObj = endDate ? new Date(endDate) : new Date();
@@ -453,30 +449,29 @@ function transformSingleMarket(market: any, event: any): Market {
   const liquidityNum = market.liquidityNum || parseFloat(market.liquidity) || 0;
   const volume24hNum = market.volume24hr || market.volume24h || 0;
   
-  // Extract category from event - use first valid tag
-  // Note: Events can have multiple tags, but we use the first valid one as the primary category
-  let eventCategory = null
-  if (event.tags && Array.isArray(event.tags) && event.tags.length > 0) {
-    // Find first tag with a valid label
-    for (const tag of event.tags) {
-      if (typeof tag === 'object' && tag.label) {
-        const label = tag.label.trim()
-        if (label && label.length > 0 && label !== 'NONE' && label.toLowerCase() !== 'none') {
-          eventCategory = label
-          break
-        }
-      } else if (typeof tag === 'string' && tag.trim()) {
-        const label = tag.trim()
-        if (label && label !== 'NONE' && label.toLowerCase() !== 'none') {
-          eventCategory = label
-          break
+  // Extract all tags from event - support multiple categories
+  // Use pre-extracted tags if provided, otherwise extract them
+  let eventTagsArray: string[] = eventTags || []
+  if (eventTagsArray.length === 0) {
+    if (event.tags && Array.isArray(event.tags) && event.tags.length > 0) {
+      for (const tag of event.tags) {
+        if (typeof tag === 'object' && tag.label) {
+          const label = tag.label.trim()
+          if (label && label.length > 0 && label !== 'NONE' && label.toLowerCase() !== 'none') {
+            eventTagsArray.push(label)
+          }
+        } else if (typeof tag === 'string' && tag.trim()) {
+          const label = tag.trim()
+          if (label && label !== 'NONE' && label.toLowerCase() !== 'none') {
+            eventTagsArray.push(label)
+          }
         }
       }
     }
   }
-  if (!eventCategory) {
-    eventCategory = event.category || market.category || null
-  }
+  
+  // Primary category is the first tag (for backward compatibility)
+  const eventCategory = eventTagsArray.length > 0 ? eventTagsArray[0] : (event.category || market.category || null)
   
   return {
     id: market.id?.toString() || market.conditionId?.toString() || '',
@@ -500,6 +495,7 @@ function transformSingleMarket(market: any, event: any): Market {
     createdAt: market.createdAt || '',
     updatedAt: market.updatedAt || '',
     description: market.description || event.description || '',
+    // Primary category (first tag) for backward compatibility
     category: (() => {
       if (eventCategory && typeof eventCategory === 'string') {
         const cat = eventCategory.trim()
@@ -509,6 +505,8 @@ function transformSingleMarket(market: any, event: any): Market {
       }
       return undefined
     })(),
+    // All tags/categories for multi-category support
+    tags: eventTagsArray.length > 0 ? eventTagsArray : undefined,
     tags: event.tags || market.tags || [],
     marketType: market.marketType || 'binary',
     fee: parseFloat(market.fee) || 0,
