@@ -17,6 +17,7 @@ interface FilterValues {
   maxNoPrice: number
   dateRange: { start: string; end: string }
   showClosed: boolean
+  maxHoursUntil: number | null // null = no filter, number = max hours until resolution
 }
 
 interface MarketFiltersProps {
@@ -44,6 +45,8 @@ interface MarketFiltersProps {
   minNoPrice: number
   maxNoPrice: number
   onNoPriceRangeChange: (min: number, max: number) => void
+  maxHoursUntil: number | null
+  onMaxHoursUntilChange: (hours: number | null) => void
   onApplyFilters: (filters: FilterValues) => void
 }
 
@@ -72,9 +75,12 @@ export default function MarketFilters({
   minNoPrice,
   maxNoPrice,
   onNoPriceRangeChange,
+  maxHoursUntil,
+  onMaxHoursUntilChange,
   onApplyFilters,
 }: MarketFiltersProps) {
   const [showFilters, setShowFilters] = useState(false)
+  const [categorySearchQuery, setCategorySearchQuery] = useState('')
   
   // Temporary filter state - only applied when "Apply Filters" is clicked
   const [tempFilters, setTempFilters] = useState<FilterValues>({
@@ -89,6 +95,7 @@ export default function MarketFilters({
     maxNoPrice,
     dateRange,
     showClosed,
+    maxHoursUntil: maxHoursUntil || null,
   })
 
   // Sync temp filters when props change (e.g., after reset)
@@ -105,8 +112,9 @@ export default function MarketFilters({
       maxNoPrice,
       dateRange,
       showClosed,
+      maxHoursUntil: maxHoursUntil || null,
     })
-  }, [selectedCategory, minVolume, maxVolume, minLiquidity, maxLiquidity, minYesPrice, maxYesPrice, minNoPrice, maxNoPrice, dateRange, showClosed])
+  }, [selectedCategory, minVolume, maxVolume, minLiquidity, maxLiquidity, minYesPrice, maxYesPrice, minNoPrice, maxNoPrice, dateRange, showClosed, maxHoursUntil])
 
   return (
     <div className="bg-polymarket-gray rounded-lg border border-gray-700 mb-6 overflow-hidden">
@@ -202,17 +210,53 @@ export default function MarketFilters({
           {/* Category Filter */}
           <div>
             <label className="block text-sm text-gray-400 mb-2">Category</label>
+            {/* Category Search Input */}
+            <input
+              type="text"
+              placeholder="🔍 Search categories..."
+              value={categorySearchQuery}
+              onChange={(e) => setCategorySearchQuery(e.target.value)}
+              className="w-full bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-white mb-2 text-sm placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-polymarket-blue focus:border-transparent"
+            />
             <select
               value={tempFilters.selectedCategory}
               onChange={(e) => setTempFilters({ ...tempFilters, selectedCategory: e.target.value })}
               className="w-full bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-white"
             >
               <option value="">All Categories</option>
-              {categories.map((cat) => (
-                <option key={cat} value={cat}>
-                  {cat}
-                </option>
-              ))}
+              {categories
+                .filter(cat => 
+                  !categorySearchQuery || cat.toLowerCase().includes(categorySearchQuery.toLowerCase())
+                )
+                .map((cat) => (
+                  <option key={cat} value={cat}>
+                    {cat}
+                  </option>
+                ))}
+            </select>
+            {categorySearchQuery && (
+              <p className="text-xs text-gray-500 mt-1">
+                Showing {categories.filter(cat => 
+                  cat.toLowerCase().includes(categorySearchQuery.toLowerCase())
+                ).length} of {categories.length} categories
+              </p>
+            )}
+          </div>
+
+          {/* Time Until Filter */}
+          <div>
+            <label className="block text-sm text-gray-400 mb-2">Time Until Resolution</label>
+            <select
+              value={tempFilters.maxHoursUntil === null ? '' : tempFilters.maxHoursUntil.toString()}
+              onChange={(e) => {
+                const value = e.target.value === '' ? null : parseInt(e.target.value)
+                setTempFilters({ ...tempFilters, maxHoursUntil: value })
+              }}
+              className="w-full bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-white"
+            >
+              <option value="">All (except finished)</option>
+              <option value="24">Less than a day</option>
+              <option value="720">Less than 30 days</option>
             </select>
           </div>
 
@@ -383,6 +427,7 @@ export default function MarketFilters({
                   onNoPriceRangeChange(tempFilters.minNoPrice, tempFilters.maxNoPrice)
                   onDateRangeChange(tempFilters.dateRange.start, tempFilters.dateRange.end)
                   onShowClosedChange(tempFilters.showClosed)
+                  onMaxHoursUntilChange(tempFilters.maxHoursUntil)
                   // Trigger filter application
                   onApplyFilters(tempFilters)
                 }}
@@ -405,8 +450,10 @@ export default function MarketFilters({
                     maxNoPrice: 100,
                     dateRange: { start: '', end: '' },
                     showClosed: false,
+                    maxHoursUntil: null,
                   }
                   setTempFilters(resetFilters)
+                  setCategorySearchQuery('') // Clear category search
                   // Apply the reset filters immediately
                   onCategoryChange('')
                   onVolumeRangeChange(0, Infinity)
@@ -415,6 +462,7 @@ export default function MarketFilters({
                   onNoPriceRangeChange(0, 100)
                   onDateRangeChange('', '')
                   onShowClosedChange(false)
+                  onMaxHoursUntilChange(null)
                   onApplyFilters(resetFilters)
                 }}
                 className="px-6 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg transition-colors font-medium text-white"

@@ -28,6 +28,7 @@ export default function Home() {
   const [maxYesPrice, setMaxYesPrice] = useState<number>(100)
   const [minNoPrice, setMinNoPrice] = useState<number>(0)
   const [maxNoPrice, setMaxNoPrice] = useState<number>(100)
+  const [maxHoursUntil, setMaxHoursUntil] = useState<number | null>(null)
   const [filterKey, setFilterKey] = useState(0)
   const [searchQuery, setSearchQuery] = useState('') // Search input value
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('') // Debounced search query for filtering
@@ -156,6 +157,25 @@ export default function Home() {
     // Remove resolved/finalized markets by default
     if (!showClosed) {
       filtered = filtered.filter(m => m.active && !m.closed && !m.finalized)
+    }
+
+    // Filter by time until resolution
+    if (maxHoursUntil !== null && maxHoursUntil > 0) {
+      const beforeCount = filtered.length
+      const maxMs = maxHoursUntil * 60 * 60 * 1000 // Convert hours to milliseconds
+      const now = new Date().getTime()
+      
+      filtered = filtered.filter(m => {
+        if (!m.endDate) return false
+        const endDate = new Date(m.endDate).getTime()
+        const timeUntil = endDate - now
+        
+        // Only include markets that haven't resolved yet and are within the time limit
+        return timeUntil > 0 && timeUntil <= maxMs
+      })
+      
+      const timeLabel = maxHoursUntil === 24 ? 'a day' : maxHoursUntil === 720 ? '30 days' : `${maxHoursUntil} hours`
+      console.log(`Time until filter (< ${timeLabel}): ${beforeCount} → ${filtered.length} markets`)
     }
 
     // Filter by category - check both primary category AND all tags (multi-category support)
@@ -486,7 +506,7 @@ export default function Home() {
     }
     
     return filtered
-  }, [allMarkets, sortField, sortOrder, tableSortField, tableSortOrder, dateRange, showClosed, selectedCategory, minVolume, maxVolume, minLiquidity, maxLiquidity, minYesPrice, maxYesPrice, minNoPrice, maxNoPrice, viewMode, filterKey, debouncedSearchQuery])
+  }, [allMarkets, sortField, sortOrder, tableSortField, tableSortOrder, dateRange, showClosed, selectedCategory, minVolume, maxVolume, minLiquidity, maxLiquidity, minYesPrice, maxYesPrice, minNoPrice, maxNoPrice, maxHoursUntil, viewMode, filterKey, debouncedSearchQuery])
 
   const handleSortChange = (field: SortField, order: SortOrder) => {
     setSortField(field)
@@ -644,6 +664,8 @@ export default function Home() {
               setMinNoPrice(min)
               setMaxNoPrice(max)
             }}
+            maxHoursUntil={maxHoursUntil}
+            onMaxHoursUntilChange={setMaxHoursUntil}
             onApplyFilters={(filters) => {
               // Update all filter state variables first
               setSelectedCategory(filters.selectedCategory)
@@ -657,6 +679,7 @@ export default function Home() {
               setMaxNoPrice(filters.maxNoPrice)
               setDateRange(filters.dateRange)
               setShowClosed(filters.showClosed)
+              setMaxHoursUntil(filters.maxHoursUntil)
               // Force re-filter by updating filterKey (triggers useMemo recalculation)
               setFilterKey(prev => prev + 1)
               console.log('Filters applied - filtering cached data:', filters)
