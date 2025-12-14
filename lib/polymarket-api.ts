@@ -236,14 +236,25 @@ async function fetchEventsInternal(eventLimit: number | null, useCache: boolean)
               return;
             }
             
-            // Extract category from tags
+            // Extract category from tags - use first tag that has a label
+            // Note: Events can have multiple tags, but we use the first one as the primary category
             let eventCategory = null
             if (event.tags && Array.isArray(event.tags) && event.tags.length > 0) {
-              const firstTag = event.tags[0]
-              if (typeof firstTag === 'object' && firstTag.label) {
-                eventCategory = firstTag.label
-              } else if (typeof firstTag === 'string') {
-                eventCategory = firstTag
+              // Find first tag with a valid label
+              for (const tag of event.tags) {
+                if (typeof tag === 'object' && tag.label) {
+                  const label = tag.label.trim()
+                  if (label && label.length > 0 && label !== 'NONE' && label.toLowerCase() !== 'none') {
+                    eventCategory = label
+                    break
+                  }
+                } else if (typeof tag === 'string' && tag.trim()) {
+                  const label = tag.trim()
+                  if (label && label !== 'NONE' && label.toLowerCase() !== 'none') {
+                    eventCategory = label
+                    break
+                  }
+                }
               }
             }
             if (!eventCategory) {
@@ -442,14 +453,25 @@ function transformSingleMarket(market: any, event: any): Market {
   const liquidityNum = market.liquidityNum || parseFloat(market.liquidity) || 0;
   const volume24hNum = market.volume24hr || market.volume24h || 0;
   
-  // Extract category from event
+  // Extract category from event - use first valid tag
+  // Note: Events can have multiple tags, but we use the first valid one as the primary category
   let eventCategory = null
   if (event.tags && Array.isArray(event.tags) && event.tags.length > 0) {
-    const firstTag = event.tags[0]
-    if (typeof firstTag === 'object' && firstTag.label) {
-      eventCategory = firstTag.label
-    } else if (typeof firstTag === 'string') {
-      eventCategory = firstTag
+    // Find first tag with a valid label
+    for (const tag of event.tags) {
+      if (typeof tag === 'object' && tag.label) {
+        const label = tag.label.trim()
+        if (label && label.length > 0 && label !== 'NONE' && label.toLowerCase() !== 'none') {
+          eventCategory = label
+          break
+        }
+      } else if (typeof tag === 'string' && tag.trim()) {
+        const label = tag.trim()
+        if (label && label !== 'NONE' && label.toLowerCase() !== 'none') {
+          eventCategory = label
+          break
+        }
+      }
     }
   }
   if (!eventCategory) {

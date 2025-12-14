@@ -2,7 +2,7 @@
 
 import { Market } from '@/lib/polymarket-api'
 import { formatCurrency, formatDate, formatDateTime, formatTimeUntil, getTimeUntilColor } from '@/lib/utils'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 
 export type TableSortField = 'question' | 'category' | 'yesPrice' | 'noPrice' | 'volume' | 'liquidity' | 'volume24h' | 'endDate' | 'daysUntil' | 'status'
 export type TableSortOrder = 'asc' | 'desc'
@@ -20,6 +20,24 @@ export default function MarketTable({ markets, onSort, sortField, sortOrder }: M
 
   const currentSortField = sortField || localSortField
   const currentSortOrder = sortOrder || localSortOrder
+
+  // Debug: Log when markets prop changes
+  useEffect(() => {
+    const marketIds = markets.map(m => m.id)
+    const uniqueIds = new Set(marketIds)
+    const hasDuplicates = marketIds.length !== uniqueIds.size
+    
+    console.log(`[MarketTable] Received ${markets.length} markets`, {
+      uniqueIds: uniqueIds.size,
+      hasDuplicates,
+      sampleIds: marketIds.slice(0, 5)
+    })
+    
+    if (hasDuplicates) {
+      const duplicates = marketIds.filter((id, index) => marketIds.indexOf(id) !== index)
+      console.warn(`[MarketTable] ⚠️ Found ${duplicates.length} duplicate market IDs:`, duplicates.slice(0, 10))
+    }
+  }, [markets])
 
   const handleSort = (field: TableSortField) => {
     const newOrder = currentSortField === field && currentSortOrder === 'asc' ? 'desc' : 'asc'

@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useMemo } from 'react'
+import { useEffect, useState, useMemo, useCallback, useTransition, startTransition } from 'react'
 import { fetchMarkets, Market } from '@/lib/polymarket-api'
 import MarketCard from '@/components/MarketCard'
 import MarketTable, { TableSortField, TableSortOrder } from '@/components/MarketTable'
@@ -29,11 +29,25 @@ export default function Home() {
   const [minNoPrice, setMinNoPrice] = useState<number>(0)
   const [maxNoPrice, setMaxNoPrice] = useState<number>(100)
   const [filterKey, setFilterKey] = useState(0)
-  const [searchQuery, setSearchQuery] = useState('') // Force re-filter when changed
+  const [searchQuery, setSearchQuery] = useState('') // Search input value
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('') // Debounced search query for filtering
+  const [isPending, startTransition] = useTransition() // For non-blocking updates
 
   useEffect(() => {
     loadMarkets()
   }, [])
+
+  // Debounce search query for better performance
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      // Use startTransition to mark filtering as non-urgent
+      startTransition(() => {
+        setDebouncedSearchQuery(searchQuery)
+      })
+    }, 150) // Reduced to 150ms for faster response
+
+    return () => clearTimeout(timer)
+  }, [searchQuery])
 
   const loadMarkets = async (clearCache: boolean = false) => {
     try {
@@ -77,32 +91,46 @@ export default function Home() {
     }
   }
 
-  // Extract unique categories
+  // Extract unique categories (normalized for consistency)
   const categories = useMemo(() => {
     const cats = new Set<string>()
     allMarkets.forEach(m => {
       const cat = m.category?.trim()
-      if (cat && cat.length > 0) {
-        cats.add(cat)
+      if (cat && cat.length > 0 && cat !== 'NONE' && cat.toLowerCase() !== 'none') {
+        cats.add(cat) // Keep original case for display
       }
     })
-    return Array.from(cats).sort()
+    const sorted = Array.from(cats).sort()
+    console.log(`Found ${sorted.length} unique categories:`, sorted.slice(0, 20))
+    return sorted
   }, [allMarkets])
 
-  // Filter and sort markets
+  // Filter and sort markets - optimized with useMemo
   const filteredAndSortedMarkets = useMemo(() => {
+    // Early return if no markets
+    if (allMarkets.length === 0) return []
+    
     let filtered = [...allMarkets]
 
-    // Search filter
-    if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase().trim()
-      filtered = filtered.filter(m => 
-        m.question.toLowerCase().includes(query) ||
-        m.description?.toLowerCase().includes(query) ||
-        m.category?.toLowerCase().includes(query) ||
-        m.slug.toLowerCase().includes(query) ||
-        m.eventSlug?.toLowerCase().includes(query)
-      )
+    // Search filter (using debounced query for better performance)
+    if (debouncedSearchQuery.trim()) {
+      const query = debouncedSearchQuery.toLowerCase().trim()
+      // Split query into words for multi-word search
+      const queryWords = query.split(/\s+/).filter(w => w.length > 0)
+      
+      filtered = filtered.filter(m => {
+        // Search in multiple fields
+        const searchableText = [
+          m.question,
+          m.description || '',
+          m.category || '',
+          m.slug,
+          m.eventSlug || '',
+        ].join(' ').toLowerCase()
+        
+        // Match all words (AND logic) - all words must be found
+        return queryWords.every(word => searchableText.includes(word))
+      })
     }
 
     // Remove resolved/finalized markets by default
@@ -110,9 +138,54 @@ export default function Home() {
       filtered = filtered.filter(m => m.active && !m.closed && !m.finalized)
     }
 
-    // Filter by category
-    if (selectedCategory) {
-      filtered = filtered.filter(m => m.category === selectedCategory)
+    // Filter by category (exact match, case-sensitive, trimmed)
+    if (selectedCategory && selectedCategory.trim()) {
+      const beforeCount = filtered.length
+      const normalizedFilter = selectedCategory.trim()
+      
+      // Filter markets - only include markets that match the selected category exactly
+      filtered = filtered.filter(m => {
+        const marketCategory = (m.category || '').trim()
+        return marketCategory === normalizedFilter
+      })
+      
+      // Debug: Check for category mismatches in filtered results
+      const categoriesInResults = new Set<string>()
+      const sampleMismatches: Array<{question: string, category: string}> = []
+      
+      filtered.forEach(m => {
+        const cat = (m.category || '').trim()
+        if (cat) {
+          categoriesInResults.add(cat)
+          // Collect mismatches for debugging
+          if (cat !== normalizedFilter && sampleMismatches.length < 10) {
+            sampleMismatches.push({
+              question: m.question.substring(0, 60),
+              category: cat
+            })
+          }
+        }
+      })
+      
+      console.log(`Category filter "${normalizedFilter}": ${beforeCount} → ${filtered.length} markets`)
+      
+      // CRITICAL: Warn if filtered results contain unexpected categories
+      const unexpected = Array.from(categoriesInResults).filter(cat => cat !== normalizedFilter)
+      if (unexpected.length > 0) {
+        console.error(`❌ CRITICAL: Category filter is broken! Found ${unexpected.length} unexpected categories:`, unexpected)
+        console.error(`   Expected ONLY: "${normalizedFilter}"`)
+        console.error(`   But found:`, Array.from(categoriesInResults))
+        console.error(`   Sample mismatches:`, sampleMismatches)
+        
+        // FIX: Re-filter to remove mismatches (safety check)
+        filtered = filtered.filter(m => {
+          const marketCategory = (m.category || '').trim()
+          return marketCategory === normalizedFilter
+        })
+        console.warn(`   Fixed: Re-filtered to ${filtered.length} markets with correct category`)
+      } else if (filtered.length > 0) {
+        console.log(`✅ Category filter working correctly - all ${filtered.length} markets have category "${normalizedFilter}"`)
+      }
     }
 
     // Filter by volume range
@@ -132,31 +205,49 @@ export default function Home() {
     }
 
     // Filter by YES price range (percentage)
-    if (minYesPrice > 0) {
+    // Apply filter if user has changed from defaults (0-100)
+    if (minYesPrice !== 0 || maxYesPrice !== 100) {
+      const beforeCount = filtered.length
       filtered = filtered.filter(m => {
-        const yesPrice = parseFloat(m.outcomePrices?.[0] || '0.5') * 100
-        return yesPrice >= minYesPrice
+        // Handle both string and number formats
+        const priceStr = m.outcomePrices?.[0]
+        const yesPrice = typeof priceStr === 'string' 
+          ? parseFloat(priceStr) * 100 
+          : (typeof priceStr === 'number' ? priceStr * 100 : 50)
+        
+        // Check if price is within range
+        const meetsMin = yesPrice >= minYesPrice
+        const meetsMax = yesPrice <= maxYesPrice
+        const inRange = meetsMin && meetsMax
+        
+        return inRange
       })
-    }
-    if (maxYesPrice < 100) {
-      filtered = filtered.filter(m => {
-        const yesPrice = parseFloat(m.outcomePrices?.[0] || '0.5') * 100
-        return yesPrice <= maxYesPrice
-      })
+      
+      // Debug logging
+      console.log(`YES Price filter applied: ${beforeCount} → ${filtered.length} markets (range: ${minYesPrice}%-${maxYesPrice}%)`)
     }
 
     // Filter by NO price range (percentage)
-    if (minNoPrice > 0) {
+    // Apply filter if user has changed from defaults (0-100)
+    if (minNoPrice !== 0 || maxNoPrice !== 100) {
+      const beforeCount = filtered.length
       filtered = filtered.filter(m => {
-        const noPrice = parseFloat(m.outcomePrices?.[1] || '0.5') * 100
-        return noPrice >= minNoPrice
+        // Handle both string and number formats
+        const priceStr = m.outcomePrices?.[1]
+        const noPrice = typeof priceStr === 'string' 
+          ? parseFloat(priceStr) * 100 
+          : (typeof priceStr === 'number' ? priceStr * 100 : 50)
+        
+        // Check if price is within range
+        const meetsMin = noPrice >= minNoPrice
+        const meetsMax = noPrice <= maxNoPrice
+        const inRange = meetsMin && meetsMax
+        
+        return inRange
       })
-    }
-    if (maxNoPrice < 100) {
-      filtered = filtered.filter(m => {
-        const noPrice = parseFloat(m.outcomePrices?.[1] || '0.5') * 100
-        return noPrice <= maxNoPrice
-      })
+      
+      // Debug logging
+      console.log(`NO Price filter applied: ${beforeCount} → ${filtered.length} markets (range: ${minNoPrice}%-${maxNoPrice}%)`)
     }
 
     // Filter by date range
@@ -258,8 +349,42 @@ export default function Home() {
       return 0
     })
 
+    // Debug: Log final filtered count and check for duplicates
+    const marketIds = filtered.map(m => m.id)
+    const uniqueIds = new Set(marketIds)
+    const hasDuplicates = marketIds.length !== uniqueIds.size
+    
+    console.log(`[Filter Debug] Final filtered markets: ${filtered.length}`, {
+      filterKey,
+      selectedCategory,
+      minYesPrice,
+      maxYesPrice,
+      minNoPrice,
+      maxNoPrice,
+      showClosed,
+      searchQuery: debouncedSearchQuery,
+      uniqueIds: uniqueIds.size,
+      hasDuplicates
+    })
+    
+    if (hasDuplicates) {
+      const duplicates = marketIds.filter((id, index) => marketIds.indexOf(id) !== index)
+      console.warn(`[Filter Debug] ⚠️ Found ${duplicates.length} duplicate market IDs in filtered results:`, duplicates.slice(0, 10))
+      
+      // Deduplicate: keep first occurrence of each ID
+      const seen = new Set<string>()
+      filtered = filtered.filter(m => {
+        if (seen.has(m.id)) {
+          return false
+        }
+        seen.add(m.id)
+        return true
+      })
+      console.log(`[Filter Debug] Deduplicated: ${marketIds.length} → ${filtered.length} markets`)
+    }
+    
     return filtered
-  }, [allMarkets, sortField, sortOrder, tableSortField, tableSortOrder, dateRange, showClosed, selectedCategory, minVolume, maxVolume, minLiquidity, maxLiquidity, minYesPrice, maxYesPrice, minNoPrice, maxNoPrice, viewMode, filterKey, searchQuery])
+  }, [allMarkets, sortField, sortOrder, tableSortField, tableSortOrder, dateRange, showClosed, selectedCategory, minVolume, maxVolume, minLiquidity, maxLiquidity, minYesPrice, maxYesPrice, minNoPrice, maxNoPrice, viewMode, filterKey, debouncedSearchQuery])
 
   const handleSortChange = (field: SortField, order: SortOrder) => {
     setSortField(field)
@@ -321,18 +446,40 @@ export default function Home() {
                 type="text"
                 placeholder="🔍 Search markets (e.g., 'paradex', 'bitcoin', etc.)..."
                 value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
+                onChange={(e) => {
+                  // Update input immediately - don't block on filtering
+                  setSearchQuery(e.target.value)
+                }}
                 className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-polymarket-blue focus:border-transparent"
               />
               {searchQuery && (
-                <button
-                  onClick={() => setSearchQuery('')}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white"
-                >
-                  ✕
-                </button>
+                <>
+                  {searchQuery !== debouncedSearchQuery && (
+                    <span className="absolute right-12 top-1/2 -translate-y-1/2 text-xs text-gray-400 animate-pulse">
+                      Searching...
+                    </span>
+                  )}
+                  <button
+                    onClick={() => setSearchQuery('')}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white transition-colors"
+                    title="Clear search"
+                  >
+                    ✕
+                  </button>
+                </>
               )}
             </div>
+            {debouncedSearchQuery && (
+              <p className="mt-2 text-sm text-gray-400">
+                {isPending ? (
+                  <span className="animate-pulse">Searching...</span>
+                ) : (
+                  <>
+                    Found {filteredAndSortedMarkets.length} market{filteredAndSortedMarkets.length !== 1 ? 's' : ''} matching "{debouncedSearchQuery}"
+                  </>
+                )}
+              </p>
+            )}
           </div>
 
           {/* Loading/Error States */}
@@ -340,7 +487,7 @@ export default function Home() {
             <div className="mb-6 p-4 bg-blue-500/10 border border-blue-500/20 rounded-lg">
               <div className="flex items-center gap-3">
                 <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-polymarket-blue"></div>
-                <p className="text-blue-400">Loading markets from Polymarket API...</p>
+                <p className="text-blue-400">Loading all markets from Polymarket API...</p>
               </div>
             </div>
           )}
@@ -396,7 +543,19 @@ export default function Home() {
               setMaxNoPrice(max)
             }}
             onApplyFilters={(filters) => {
-              // Force re-filter by updating filterKey
+              // Update all filter state variables first
+              setSelectedCategory(filters.selectedCategory)
+              setMinVolume(filters.minVolume)
+              setMaxVolume(filters.maxVolume)
+              setMinLiquidity(filters.minLiquidity)
+              setMaxLiquidity(filters.maxLiquidity)
+              setMinYesPrice(filters.minYesPrice)
+              setMaxYesPrice(filters.maxYesPrice)
+              setMinNoPrice(filters.minNoPrice)
+              setMaxNoPrice(filters.maxNoPrice)
+              setDateRange(filters.dateRange)
+              setShowClosed(filters.showClosed)
+              // Force re-filter by updating filterKey (triggers useMemo recalculation)
               setFilterKey(prev => prev + 1)
               console.log('Filters applied - filtering cached data:', filters)
             }}
