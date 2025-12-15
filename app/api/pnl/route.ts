@@ -20,20 +20,42 @@ export async function GET(request: Request) {
       )
     }
 
-    // Fetch both current and closed positions in parallel
-    // Use limit=1000 to get more closed positions (default is ~10)
-    const [currentResponse, closedResponse] = await Promise.all([
-      fetch(`${DATA_API_POSITIONS_ENDPOINT}?user=${walletAddress}`, {
+    // Fetch current positions
+    const currentResponse = await fetch(`${DATA_API_POSITIONS_ENDPOINT}?user=${walletAddress}`, {
+      method: 'GET',
+      headers: { 'Content-Type': 'application/json' },
+      next: { revalidate: 60 },
+    })
+
+    // Fetch all closed positions with pagination (max 500 per request)
+    let allClosedPositions: any[] = []
+    let offset = 0
+    const limit = 500
+    let hasMore = true
+
+    while (hasMore) {
+      const closedResponse = await fetch(`${DATA_API_CLOSED_POSITIONS_ENDPOINT}?user=${walletAddress}&limit=${limit}&offset=${offset}`, {
         method: 'GET',
         headers: { 'Content-Type': 'application/json' },
         next: { revalidate: 60 },
-      }),
-      fetch(`${DATA_API_CLOSED_POSITIONS_ENDPOINT}?user=${walletAddress}&limit=1000`, {
-        method: 'GET',
-        headers: { 'Content-Type': 'application/json' },
-        next: { revalidate: 60 },
-      }),
-    ])
+      })
+
+      if (!closedResponse.ok) {
+        break
+      }
+
+      const closedPositions = await closedResponse.json()
+      if (!Array.isArray(closedPositions) || closedPositions.length === 0) {
+        hasMore = false
+      } else {
+        allClosedPositions.push(...closedPositions)
+        offset += limit
+        // If we got fewer than the limit, we've reached the end
+        if (closedPositions.length < limit) {
+          hasMore = false
+        }
+      }
+    }
 
     // Process current positions (unrealized PNL)
     let unrealizedPnL = 0
@@ -49,14 +71,11 @@ export async function GET(request: Request) {
 
     // Process closed positions (realized PNL)
     let realizedPnL = 0
-    if (closedResponse.ok) {
-      const closedPositions = await closedResponse.json()
-      if (Array.isArray(closedPositions)) {
-        realizedPnL = closedPositions.reduce((sum, position) => {
-          const pnl = position.realizedPnl ?? 0
-          return sum + (typeof pnl === 'number' ? pnl : 0)
-        }, 0)
-      }
+    if (allClosedPositions.length > 0) {
+      realizedPnL = allClosedPositions.reduce((sum, position) => {
+        const pnl = position.realizedPnl ?? 0
+        return sum + (typeof pnl === 'number' ? pnl : 0)
+      }, 0)
     }
 
     // Total all-time PNL = realized (from closed) + unrealized (from current)
