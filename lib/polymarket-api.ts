@@ -57,6 +57,36 @@ export interface Market {
   minutesUntilResolution?: number;
   secondsUntilResolution?: number;
   eventSlug?: string; // Event slug for grouping multiple markets
+  // Condition ID for fetching holders
+  conditionId?: string;
+  // CLOB token IDs for YES/NO outcomes
+  clobTokenIds?: string[];
+}
+
+// Holder data types
+export interface Holder {
+  proxyWallet: string;
+  bio?: string;
+  asset?: string;
+  pseudonym?: string;
+  amount: number;
+  displayUsernamePublic?: boolean;
+  outcomeIndex: number;
+  name?: string;
+  profileImage?: string;
+  profileImageOptimized?: string;
+}
+
+export interface TokenHolders {
+  token: string;
+  holders: Holder[];
+}
+
+export interface HoldersResponse {
+  yesHolders: Holder[];
+  noHolders: Holder[];
+  yesCount: number;
+  noCount: number;
 }
 
 export interface Event {
@@ -527,7 +557,63 @@ function transformSingleMarket(market: any, event: any, eventTags?: string[]): M
     hoursUntilResolution: hoursUntil,
     minutesUntilResolution: minutesUntil,
     secondsUntilResolution: secondsUntil,
+    // Condition ID for fetching holders (use market.conditionId or market.id)
+    conditionId: market.conditionId || market.id?.toString() || '',
+    // CLOB token IDs for YES/NO outcomes
+    clobTokenIds: market.clobTokenIds || [],
   };
+}
+
+// Fetch holders for a specific market
+// Note: Polymarket API maximum limit is 500 holders per request
+export async function fetchMarketHolders(conditionId: string, limit: number = 500): Promise<HoldersResponse> {
+  try {
+    const response = await fetch(`/api/holders?market=${conditionId}&limit=${limit}`)
+    
+    if (!response.ok) {
+      throw new Error(`Failed to fetch holders: ${response.status}`)
+    }
+    
+    const data = await response.json()
+    
+    // Parse the response - API returns array of token holders
+    const yesHolders: Holder[] = []
+    const noHolders: Holder[] = []
+    
+    if (Array.isArray(data)) {
+      for (const tokenData of data) {
+        if (tokenData.holders && Array.isArray(tokenData.holders)) {
+          for (const holder of tokenData.holders) {
+            // outcomeIndex 0 = YES, 1 = NO
+            if (holder.outcomeIndex === 0) {
+              yesHolders.push(holder)
+            } else if (holder.outcomeIndex === 1) {
+              noHolders.push(holder)
+            }
+          }
+        }
+      }
+    }
+    
+    // Sort by amount descending
+    yesHolders.sort((a, b) => b.amount - a.amount)
+    noHolders.sort((a, b) => b.amount - a.amount)
+    
+    return {
+      yesHolders,
+      noHolders,
+      yesCount: yesHolders.length,
+      noCount: noHolders.length,
+    }
+  } catch (error) {
+    console.error('Error fetching market holders:', error)
+    return {
+      yesHolders: [],
+      noHolders: [],
+      yesCount: 0,
+      noCount: 0,
+    }
+  }
 }
 
 // Legacy function: Flatten events to markets for backward compatibility with existing UI

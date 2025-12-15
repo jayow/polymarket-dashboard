@@ -2,13 +2,16 @@
 
 import { Market } from '@/lib/polymarket-api'
 import { formatCurrency, formatDate, formatTimeUntil, getTimeUntilColor } from '@/lib/utils'
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
+import HoldersModal from './HoldersModal'
 
 interface MarketCardProps {
   market: Market
 }
 
 export default function MarketCard({ market }: MarketCardProps) {
+  const [isHoldersModalOpen, setIsHoldersModalOpen] = useState(false)
+
   const yesPrice = useMemo(() => {
     return market.outcomePrices?.[0] ? parseFloat(market.outcomePrices[0]) : 0.5
   }, [market.outcomePrices])
@@ -151,18 +154,29 @@ export default function MarketCard({ market }: MarketCardProps) {
               </span>
             )}
           </div>
-          {(market.numTraders || market.numTrades) && (
-            <div className="flex items-center gap-3">
-              {market.numTraders && (
-                <span>{market.numTraders} traders</span>
-              )}
-              {market.numTrades && (
-                <span>{market.numTrades} trades</span>
-              )}
-            </div>
-          )}
+          <button
+            onClick={(e) => {
+              e.stopPropagation()
+              setIsHoldersModalOpen(true)
+            }}
+            className="px-2 py-1 bg-gray-800 hover:bg-gray-700 border border-gray-600 rounded text-xs text-gray-300 hover:text-white transition-colors flex items-center gap-1"
+            title="View market holders"
+          >
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+            </svg>
+            Holders
+          </button>
         </div>
       </div>
+
+      {/* Holders Modal */}
+      <HoldersModal
+        isOpen={isHoldersModalOpen}
+        onClose={() => setIsHoldersModalOpen(false)}
+        marketId={market.conditionId || market.id || ''}
+        marketQuestion={market.question || ''}
+      />
     </div>
   )
 }

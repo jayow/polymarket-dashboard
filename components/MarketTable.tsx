@@ -3,6 +3,7 @@
 import { Market } from '@/lib/polymarket-api'
 import { formatCurrency, formatDate, formatDateTime, formatTimeUntil, getTimeUntilColor } from '@/lib/utils'
 import { useState, useEffect } from 'react'
+import HoldersModal from './HoldersModal'
 
 export type TableSortField = 'question' | 'category' | 'yesPrice' | 'noPrice' | 'volume' | 'liquidity' | 'volume24h' | 'endDate' | 'daysUntil' | 'status'
 export type TableSortOrder = 'asc' | 'desc'
@@ -17,9 +18,21 @@ interface MarketTableProps {
 export default function MarketTable({ markets, onSort, sortField, sortOrder }: MarketTableProps) {
   const [localSortField, setLocalSortField] = useState<TableSortField>('endDate')
   const [localSortOrder, setLocalSortOrder] = useState<TableSortOrder>('asc')
+  const [selectedMarket, setSelectedMarket] = useState<Market | null>(null)
+  const [isHoldersModalOpen, setIsHoldersModalOpen] = useState(false)
 
   const currentSortField = sortField || localSortField
   const currentSortOrder = sortOrder || localSortOrder
+
+  const handleOpenHolders = (market: Market) => {
+    setSelectedMarket(market)
+    setIsHoldersModalOpen(true)
+  }
+
+  const handleCloseHolders = () => {
+    setIsHoldersModalOpen(false)
+    setSelectedMarket(null)
+  }
 
   // Debug: Log when markets prop changes
   useEffect(() => {
@@ -121,6 +134,9 @@ export default function MarketTable({ markets, onSort, sortField, sortOrder }: M
             >
               Status <SortIcon field="status" />
             </th>
+            <th className="text-center p-4 text-sm font-semibold text-gray-300">
+              Holders
+            </th>
           </tr>
         </thead>
         <tbody>
@@ -221,11 +237,31 @@ export default function MarketTable({ markets, onSort, sortField, sortOrder }: M
                     {statusText}
                   </span>
                 </td>
+                <td className="p-4 text-center">
+                  <button
+                    onClick={() => handleOpenHolders(market)}
+                    className="px-3 py-1.5 bg-polymarket-gray hover:bg-gray-700 border border-gray-600 rounded-lg text-sm text-gray-300 hover:text-white transition-colors flex items-center gap-2 mx-auto"
+                    title="View market holders"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                    </svg>
+                    View
+                  </button>
+                </td>
               </tr>
             )
           })}
         </tbody>
       </table>
+
+      {/* Holders Modal */}
+      <HoldersModal
+        isOpen={isHoldersModalOpen}
+        onClose={handleCloseHolders}
+        marketId={selectedMarket?.conditionId || selectedMarket?.id || ''}
+        marketQuestion={selectedMarket?.question || ''}
+      />
     </div>
   )
 }

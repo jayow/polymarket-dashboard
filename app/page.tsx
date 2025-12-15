@@ -326,50 +326,42 @@ export default function Home() {
       filtered = filtered.filter(m => m.liquidityNum <= maxLiquidity)
     }
 
-    // Filter by YES price range (percentage)
-    // Apply filter if user has changed from defaults (0-100)
-    if (minYesPrice !== 0 || maxYesPrice !== 100) {
+    // Filter by YES or NO price range (OR logic)
+    const yesPriceFilterActive = minYesPrice !== 0 || maxYesPrice !== 100
+    const noPriceFilterActive = minNoPrice !== 0 || maxNoPrice !== 100
+    
+    if (yesPriceFilterActive || noPriceFilterActive) {
       const beforeCount = filtered.length
       filtered = filtered.filter(m => {
-        // Handle both string and number formats
-        const priceStr = m.outcomePrices?.[0]
-        const yesPrice = typeof priceStr === 'string' 
-          ? parseFloat(priceStr) * 100 
-          : (typeof priceStr === 'number' ? priceStr * 100 : 50)
+        let matchesYes = false
+        let matchesNo = false
         
-        // Check if price is within range
-        const meetsMin = yesPrice >= minYesPrice
-        const meetsMax = yesPrice <= maxYesPrice
-        const inRange = meetsMin && meetsMax
+        // Check YES price range
+        if (yesPriceFilterActive) {
+          const priceStr = m.outcomePrices?.[0]
+          const yesPrice = typeof priceStr === 'string' 
+            ? parseFloat(priceStr) * 100 
+            : (typeof priceStr === 'number' ? priceStr * 100 : 50)
+          matchesYes = yesPrice >= minYesPrice && yesPrice <= maxYesPrice
+        }
         
-        return inRange
+        // Check NO price range
+        if (noPriceFilterActive) {
+          const priceStr = m.outcomePrices?.[1]
+          const noPrice = typeof priceStr === 'string' 
+            ? parseFloat(priceStr) * 100 
+            : (typeof priceStr === 'number' ? priceStr * 100 : 50)
+          matchesNo = noPrice >= minNoPrice && noPrice <= maxNoPrice
+        }
+        
+        // Match if YES price is in range OR NO price is in range
+        return matchesYes || matchesNo
       })
       
-      // Debug logging
-      console.log(`YES Price filter applied: ${beforeCount} → ${filtered.length} markets (range: ${minYesPrice}%-${maxYesPrice}%)`)
-    }
-
-    // Filter by NO price range (percentage)
-    // Apply filter if user has changed from defaults (0-100)
-    if (minNoPrice !== 0 || maxNoPrice !== 100) {
-      const beforeCount = filtered.length
-      filtered = filtered.filter(m => {
-        // Handle both string and number formats
-        const priceStr = m.outcomePrices?.[1]
-        const noPrice = typeof priceStr === 'string' 
-          ? parseFloat(priceStr) * 100 
-          : (typeof priceStr === 'number' ? priceStr * 100 : 50)
-        
-        // Check if price is within range
-        const meetsMin = noPrice >= minNoPrice
-        const meetsMax = noPrice <= maxNoPrice
-        const inRange = meetsMin && meetsMax
-        
-        return inRange
-      })
-      
-      // Debug logging
-      console.log(`NO Price filter applied: ${beforeCount} → ${filtered.length} markets (range: ${minNoPrice}%-${maxNoPrice}%)`)
+      const filters = []
+      if (yesPriceFilterActive) filters.push(`YES: ${minYesPrice}%-${maxYesPrice}%`)
+      if (noPriceFilterActive) filters.push(`NO: ${minNoPrice}%-${maxNoPrice}%`)
+      console.log(`Price filter applied (OR): ${beforeCount} → ${filtered.length} markets (${filters.join(' OR ')})`)
     }
 
     // Filter by date range

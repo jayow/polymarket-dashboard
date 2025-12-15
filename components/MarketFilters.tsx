@@ -50,6 +50,55 @@ interface MarketFiltersProps {
   onApplyFilters: (filters: FilterValues) => void
 }
 
+// Simple Price Range Input Component (no slider, just two number inputs)
+function PriceRangeInput({ 
+  label, 
+  min, 
+  max, 
+  onMinChange, 
+  onMaxChange 
+}: { 
+  label: string
+  min: number
+  max: number
+  onMinChange: (value: number) => void
+  onMaxChange: (value: number) => void
+}) {
+  return (
+    <div>
+      <label className="block text-sm text-gray-400 mb-2">{label}</label>
+      <div className="flex items-center gap-2">
+        <input
+          type="number"
+          min="0"
+          max="100"
+          value={min}
+          onChange={(e) => {
+            const val = Math.max(0, Math.min(100, parseInt(e.target.value) || 0))
+            onMinChange(Math.min(val, max))
+          }}
+          className="w-20 bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-white text-center"
+          placeholder="Min"
+        />
+        <span className="text-gray-400">-</span>
+        <input
+          type="number"
+          min="0"
+          max="100"
+          value={max}
+          onChange={(e) => {
+            const val = Math.max(0, Math.min(100, parseInt(e.target.value) || 100))
+            onMaxChange(Math.max(val, min))
+          }}
+          className="w-20 bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-white text-center"
+          placeholder="Max"
+        />
+        <span className="text-gray-400 text-sm">%</span>
+      </div>
+    </div>
+  )
+}
+
 export default function MarketFilters({
   sortField,
   sortOrder,
@@ -307,100 +356,22 @@ export default function MarketFilters({
           </div>
 
           {/* YES Price Range */}
-          <div>
-            <div className="flex items-center justify-between mb-2">
-              <label className="block text-sm text-gray-400">YES Price Range (%)</label>
-              <span className="text-sm font-semibold text-white">
-                {tempFilters.minYesPrice || 0}% - {tempFilters.maxYesPrice || 100}%
-              </span>
-            </div>
-            <div className="space-y-2">
-              <div className="flex items-center gap-3">
-                <span className="text-xs text-gray-500 w-12">Min:</span>
-                <input
-                  type="range"
-                  min="0"
-                  max="100"
-                  step="1"
-                  value={tempFilters.minYesPrice || 0}
-                  onChange={(e) => {
-                    const min = parseInt(e.target.value)
-                    // Ensure min doesn't exceed max
-                    const max = Math.max(min, tempFilters.maxYesPrice || 100)
-                    setTempFilters({ ...tempFilters, minYesPrice: min, maxYesPrice: max })
-                  }}
-                  className="flex-1 h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-polymarket-blue"
-                />
-                <span className="text-xs text-gray-400 w-12 text-right">{tempFilters.minYesPrice || 0}%</span>
-              </div>
-              <div className="flex items-center gap-3">
-                <span className="text-xs text-gray-500 w-12">Max:</span>
-                <input
-                  type="range"
-                  min="0"
-                  max="100"
-                  step="1"
-                  value={tempFilters.maxYesPrice || 100}
-                  onChange={(e) => {
-                    const max = parseInt(e.target.value)
-                    // Ensure max doesn't go below min
-                    const min = Math.min(max, tempFilters.minYesPrice || 0)
-                    setTempFilters({ ...tempFilters, maxYesPrice: max, minYesPrice: min })
-                  }}
-                  className="flex-1 h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-polymarket-blue"
-                />
-                <span className="text-xs text-gray-400 w-12 text-right">{tempFilters.maxYesPrice || 100}%</span>
-              </div>
-            </div>
-          </div>
+          <PriceRangeInput
+            label="YES Price Range (%)"
+            min={tempFilters.minYesPrice || 0}
+            max={tempFilters.maxYesPrice || 100}
+            onMinChange={(min) => setTempFilters({ ...tempFilters, minYesPrice: min })}
+            onMaxChange={(max) => setTempFilters({ ...tempFilters, maxYesPrice: max })}
+          />
 
           {/* NO Price Range */}
-          <div>
-            <div className="flex items-center justify-between mb-2">
-              <label className="block text-sm text-gray-400">NO Price Range (%)</label>
-              <span className="text-sm font-semibold text-white">
-                {tempFilters.minNoPrice || 0}% - {tempFilters.maxNoPrice || 100}%
-              </span>
-            </div>
-            <div className="space-y-2">
-              <div className="flex items-center gap-3">
-                <span className="text-xs text-gray-500 w-12">Min:</span>
-                <input
-                  type="range"
-                  min="0"
-                  max="100"
-                  step="1"
-                  value={tempFilters.minNoPrice || 0}
-                  onChange={(e) => {
-                    const min = parseInt(e.target.value)
-                    // Ensure min doesn't exceed max
-                    const max = Math.max(min, tempFilters.maxNoPrice || 100)
-                    setTempFilters({ ...tempFilters, minNoPrice: min, maxNoPrice: max })
-                  }}
-                  className="flex-1 h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-polymarket-blue"
-                />
-                <span className="text-xs text-gray-400 w-12 text-right">{tempFilters.minNoPrice || 0}%</span>
-              </div>
-              <div className="flex items-center gap-3">
-                <span className="text-xs text-gray-500 w-12">Max:</span>
-                <input
-                  type="range"
-                  min="0"
-                  max="100"
-                  step="1"
-                  value={tempFilters.maxNoPrice || 100}
-                  onChange={(e) => {
-                    const max = parseInt(e.target.value)
-                    // Ensure max doesn't go below min
-                    const min = Math.min(max, tempFilters.minNoPrice || 0)
-                    setTempFilters({ ...tempFilters, maxNoPrice: max, minNoPrice: min })
-                  }}
-                  className="flex-1 h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-polymarket-blue"
-                />
-                <span className="text-xs text-gray-400 w-12 text-right">{tempFilters.maxNoPrice || 100}%</span>
-              </div>
-            </div>
-          </div>
+          <PriceRangeInput
+            label="NO Price Range (%)"
+            min={tempFilters.minNoPrice || 0}
+            max={tempFilters.maxNoPrice || 100}
+            onMinChange={(min) => setTempFilters({ ...tempFilters, minNoPrice: min })}
+            onMaxChange={(max) => setTempFilters({ ...tempFilters, maxNoPrice: max })}
+          />
 
           </div>
           
