@@ -2,6 +2,132 @@
 
 import { useState, useEffect, useRef } from 'react'
 
+// Searchable Dropdown Component
+function SearchableDropdown({
+  value,
+  options,
+  placeholder = 'Select...',
+  searchPlaceholder = 'Search...',
+  onChange
+}: {
+  value: string
+  options: string[]
+  placeholder?: string
+  searchPlaceholder?: string
+  onChange: (value: string) => void
+}) {
+  const [isOpen, setIsOpen] = useState(false)
+  const [search, setSearch] = useState('')
+  const containerRef = useRef<HTMLDivElement>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
+  
+  // Filter options based on search
+  const filteredOptions = options.filter(opt =>
+    !search || opt.toLowerCase().includes(search.toLowerCase())
+  )
+  
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setIsOpen(false)
+        setSearch('')
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
+  
+  // Focus input when dropdown opens
+  useEffect(() => {
+    if (isOpen && inputRef.current) {
+      inputRef.current.focus()
+    }
+  }, [isOpen])
+  
+  const handleSelect = (opt: string) => {
+    onChange(opt)
+    setIsOpen(false)
+    setSearch('')
+  }
+  
+  return (
+    <div ref={containerRef} className="relative">
+      {/* Selected value display / trigger button */}
+      <button
+        type="button"
+        onClick={() => setIsOpen(!isOpen)}
+        className="w-full bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-white text-left flex items-center justify-between hover:border-gray-500 transition-colors"
+      >
+        <span className={value ? 'text-white' : 'text-gray-400'}>
+          {value || placeholder}
+        </span>
+        <svg 
+          className={`w-4 h-4 text-gray-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} 
+          fill="none" 
+          stroke="currentColor" 
+          viewBox="0 0 24 24"
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+      
+      {/* Dropdown panel */}
+      {isOpen && (
+        <div className="absolute z-50 w-full mt-1 bg-gray-800 border border-gray-600 rounded-lg shadow-xl overflow-hidden">
+          {/* Search input inside dropdown */}
+          <div className="p-2 border-b border-gray-700">
+            <input
+              ref={inputRef}
+              type="text"
+              placeholder={searchPlaceholder}
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-full bg-gray-700 border border-gray-600 rounded px-3 py-1.5 text-white text-sm placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-blue-500"
+            />
+          </div>
+          
+          {/* Options list */}
+          <div className="max-h-48 overflow-y-auto">
+            {/* All option */}
+            <button
+              type="button"
+              onClick={() => handleSelect('')}
+              className={`w-full px-3 py-2 text-left text-sm hover:bg-gray-700 transition-colors ${!value ? 'bg-gray-700 text-blue-400' : 'text-gray-300'}`}
+            >
+              {placeholder}
+            </button>
+            
+            {filteredOptions.length === 0 ? (
+              <div className="px-3 py-2 text-sm text-gray-500">
+                No categories found
+              </div>
+            ) : (
+              filteredOptions.map((opt) => (
+                <button
+                  key={opt}
+                  type="button"
+                  onClick={() => handleSelect(opt)}
+                  className={`w-full px-3 py-2 text-left text-sm hover:bg-gray-700 transition-colors ${value === opt ? 'bg-gray-700 text-blue-400' : 'text-gray-300'}`}
+                >
+                  {opt}
+                </button>
+              ))
+            )}
+          </div>
+          
+          {/* Count indicator */}
+          {search && (
+            <div className="px-3 py-1.5 text-xs text-gray-500 border-t border-gray-700">
+              {filteredOptions.length} of {options.length} categories
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
 export type SortOrder = 'asc' | 'desc'
 export type SortField = 'endDate' | 'volume' | 'liquidity' | 'price' | 'daysUntil'
 
@@ -305,7 +431,6 @@ export default function MarketFilters({
   onApplyFilters,
 }: MarketFiltersProps) {
   const [showFilters, setShowFilters] = useState(false)
-  const [categorySearchQuery, setCategorySearchQuery] = useState('')
   
   // Temporary filter state - only applied when "Apply Filters" is clicked
   const [tempFilters, setTempFilters] = useState<FilterValues>({
@@ -438,40 +563,16 @@ export default function MarketFilters({
             />
           </div>
 
-          {/* Category Filter */}
-          <div>
+          {/* Category Filter - Searchable Dropdown */}
+          <div className="relative">
             <label className="block text-sm text-gray-400 mb-2">Category</label>
-            {/* Category Search Input */}
-            <input
-              type="text"
-              placeholder="🔍 Search categories..."
-              value={categorySearchQuery}
-              onChange={(e) => setCategorySearchQuery(e.target.value)}
-              className="w-full bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-white mb-2 text-sm placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-polymarket-blue focus:border-transparent"
-            />
-            <select
+            <SearchableDropdown
               value={tempFilters.selectedCategory}
-              onChange={(e) => setTempFilters({ ...tempFilters, selectedCategory: e.target.value })}
-              className="w-full bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-white"
-            >
-              <option value="">All Categories</option>
-              {categories
-                .filter(cat => 
-                  !categorySearchQuery || cat.toLowerCase().includes(categorySearchQuery.toLowerCase())
-                )
-                .map((cat) => (
-                  <option key={cat} value={cat}>
-                    {cat}
-                  </option>
-                ))}
-            </select>
-            {categorySearchQuery && (
-              <p className="text-xs text-gray-500 mt-1">
-                Showing {categories.filter(cat => 
-                  cat.toLowerCase().includes(categorySearchQuery.toLowerCase())
-                ).length} of {categories.length} categories
-              </p>
-            )}
+              options={categories}
+              placeholder="All Categories"
+              searchPlaceholder="Search categories..."
+              onChange={(value) => setTempFilters({ ...tempFilters, selectedCategory: value })}
+            />
           </div>
 
           {/* Time Until Filter */}
@@ -683,7 +784,6 @@ export default function MarketFilters({
                     minAskUSD: null,
                   }
                   setTempFilters(resetFilters)
-                  setCategorySearchQuery('') // Clear category search
                   // Apply the reset filters immediately
                   onCategoryChange('')
                   onVolumeRangeChange(0, Infinity)
