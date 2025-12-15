@@ -291,13 +291,12 @@ function formatShareAmount(amount: number): string {
   })
 }
 
-// Build a profile URL. Prefer handle-style URLs (polymarket.com/@username) when we
-// have a name or pseudonym. Otherwise fall back to the account (wallet) URL.
+// Build a profile URL using polymarket.com/@ format
+// Works with both usernames and wallet addresses
 function buildProfileUrl(holder: Holder): string {
-  const handle = holder.name || holder.pseudonym
-  if (handle) {
-    const sanitized = handle.startsWith('@') ? handle.slice(1) : handle
-    return `https://polymarket.com/@${sanitized}`
-  }
-  return `https://polymarket.com/account/${holder.proxyWallet}`
+  // Use name/username if available, otherwise use wallet address
+  const handle = holder.name || holder.pseudonym || holder.proxyWallet
+  if (!handle) return 'https://polymarket.com'
+  const sanitized = handle.startsWith('@') ? handle.slice(1) : handle
+  return `https://polymarket.com/@${sanitized}`
 }
