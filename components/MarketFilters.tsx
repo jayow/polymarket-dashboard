@@ -63,7 +63,7 @@ interface MarketFiltersProps {
   onApplyFilters: (filters: FilterValues) => void
 }
 
-// Dual Range Slider Component for price ranges
+// Custom Dual Range Slider Component using mouse events for reliable interaction
 function DualRangeSlider({ 
   label, 
   min, 
@@ -79,18 +79,81 @@ function DualRangeSlider({
   onMaxChange: (value: number) => void
   color?: 'blue' | 'green' | 'red'
 }) {
-  const minRef = useRef<HTMLInputElement>(null)
-  const maxRef = useRef<HTMLInputElement>(null)
+  const trackRef = useRef<HTMLDivElement>(null)
+  const [dragging, setDragging] = useState<'min' | 'max' | null>(null)
   
-  const colorClasses = {
-    blue: { bg: 'bg-blue-500', border: 'border-blue-500' },
-    green: { bg: 'bg-green-500', border: 'border-green-500' },
-    red: { bg: 'bg-red-500', border: 'border-red-500' }
+  const colorConfig = {
+    blue: { bg: 'bg-blue-500', ring: 'ring-blue-400', border: 'border-blue-500' },
+    green: { bg: 'bg-green-500', ring: 'ring-green-400', border: 'border-green-500' },
+    red: { bg: 'bg-red-500', ring: 'ring-red-400', border: 'border-red-500' }
   }
   
-  // Calculate thumb positions for visual feedback
-  const minThumbPos = min
-  const maxThumbPos = max
+  const colors = colorConfig[color]
+  
+  // Convert mouse position to percentage value
+  const getValueFromPosition = (clientX: number): number => {
+    if (!trackRef.current) return 0
+    const rect = trackRef.current.getBoundingClientRect()
+    const percentage = ((clientX - rect.left) / rect.width) * 100
+    return Math.round(Math.max(0, Math.min(100, percentage)))
+  }
+  
+  // Handle mouse down on thumb
+  const handleThumbMouseDown = (thumb: 'min' | 'max') => (e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setDragging(thumb)
+  }
+  
+  // Handle mouse move (drag)
+  useEffect(() => {
+    if (!dragging) return
+    
+    const handleMouseMove = (e: MouseEvent) => {
+      const value = getValueFromPosition(e.clientX)
+      
+      if (dragging === 'min') {
+        // Min thumb can't go past max - 1
+        const newMin = Math.min(value, max - 1)
+        onMinChange(newMin)
+      } else {
+        // Max thumb can't go below min + 1
+        const newMax = Math.max(value, min + 1)
+        onMaxChange(newMax)
+      }
+    }
+    
+    const handleMouseUp = () => {
+      setDragging(null)
+    }
+    
+    document.addEventListener('mousemove', handleMouseMove)
+    document.addEventListener('mouseup', handleMouseUp)
+    
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove)
+      document.removeEventListener('mouseup', handleMouseUp)
+    }
+  }, [dragging, min, max, onMinChange, onMaxChange])
+  
+  // Handle click on track to move nearest thumb
+  const handleTrackClick = (e: React.MouseEvent) => {
+    if (dragging) return // Don't handle track clicks while dragging
+    
+    const value = getValueFromPosition(e.clientX)
+    
+    // Move the closest thumb
+    const distToMin = Math.abs(value - min)
+    const distToMax = Math.abs(value - max)
+    
+    if (distToMin <= distToMax) {
+      // Move min thumb (but not past max)
+      onMinChange(Math.min(value, max - 1))
+    } else {
+      // Move max thumb (but not below min)
+      onMaxChange(Math.max(value, min + 1))
+    }
+  }
   
   return (
     <div>
@@ -107,61 +170,46 @@ function DualRangeSlider({
             const val = Math.max(0, Math.min(99, parseInt(e.target.value) || 0))
             if (val < max) onMinChange(val)
           }}
-          className={`w-16 bg-gray-800 border ${colorClasses[color].border} rounded px-2 py-1 text-white text-center text-sm font-mono`}
+          className={`w-14 bg-gray-800 border ${colors.border} rounded px-2 py-1 text-white text-center text-sm font-mono`}
         />
-        <div className="flex-1 relative h-8 flex items-center">
+        
+        {/* Custom slider track */}
+        <div 
+          ref={trackRef}
+          className="flex-1 relative h-10 flex items-center cursor-pointer select-none"
+          onClick={handleTrackClick}
+        >
           {/* Track background */}
           <div className="absolute w-full h-2 bg-gray-700 rounded-full" />
           
           {/* Active range highlight */}
           <div 
-            className={`absolute h-2 ${colorClasses[color].bg} rounded-full opacity-60`}
+            className={`absolute h-2 ${colors.bg} rounded-full opacity-70`}
             style={{
-              left: `${minThumbPos}%`,
-              width: `${maxThumbPos - minThumbPos}%`
+              left: `${min}%`,
+              width: `${max - min}%`
             }}
           />
           
-          {/* Min Range Input - Lower z-index, pointer events enabled */}
-          <input
-            ref={minRef}
-            type="range"
-            min="0"
-            max="100"
-            value={min}
-            onChange={(e) => {
-              const newMin = parseInt(e.target.value)
-              if (newMin < max) {
-                onMinChange(newMin)
-              }
-            }}
-            className="absolute w-full h-2 appearance-none bg-transparent cursor-pointer"
-            style={{ 
-              zIndex: 10,
-              pointerEvents: 'auto'
-            }}
-          />
+          {/* Min Thumb */}
+          <div
+            className={`absolute w-6 h-6 rounded-full bg-white border-2 ${colors.border} shadow-lg cursor-grab active:cursor-grabbing transform -translate-x-1/2 transition-shadow ${dragging === 'min' ? 'ring-2 ' + colors.ring + ' scale-110' : 'hover:ring-2 hover:' + colors.ring}`}
+            style={{ left: `${min}%`, zIndex: dragging === 'min' ? 30 : 20 }}
+            onMouseDown={handleThumbMouseDown('min')}
+          >
+            <div className={`absolute inset-1 rounded-full ${colors.bg} opacity-50`} />
+          </div>
           
-          {/* Max Range Input - Higher z-index for right side */}
-          <input
-            ref={maxRef}
-            type="range"
-            min="0"
-            max="100"
-            value={max}
-            onChange={(e) => {
-              const newMax = parseInt(e.target.value)
-              if (newMax > min) {
-                onMaxChange(newMax)
-              }
-            }}
-            className="absolute w-full h-2 appearance-none bg-transparent cursor-pointer"
-            style={{ 
-              zIndex: 20,
-              pointerEvents: 'auto'
-            }}
-          />
+          {/* Max Thumb */}
+          <div
+            className={`absolute w-6 h-6 rounded-full bg-white border-2 ${colors.border} shadow-lg cursor-grab active:cursor-grabbing transform -translate-x-1/2 transition-shadow ${dragging === 'max' ? 'ring-2 ' + colors.ring + ' scale-110' : 'hover:ring-2 hover:' + colors.ring}`}
+            style={{ left: `${max}%`, zIndex: dragging === 'max' ? 30 : 20 }}
+            onMouseDown={handleThumbMouseDown('max')}
+          >
+            <div className={`absolute inset-1 rounded-full ${colors.bg} opacity-50`} />
+          </div>
         </div>
+        
         <input
           type="number"
           min="1"
@@ -171,7 +219,7 @@ function DualRangeSlider({
             const val = Math.max(1, Math.min(100, parseInt(e.target.value) || 100))
             if (val > min) onMaxChange(val)
           }}
-          className={`w-16 bg-gray-800 border ${colorClasses[color].border} rounded px-2 py-1 text-white text-center text-sm font-mono`}
+          className={`w-14 bg-gray-800 border ${colors.border} rounded px-2 py-1 text-white text-center text-sm font-mono`}
         />
       </div>
       
@@ -180,28 +228,28 @@ function DualRangeSlider({
         <button
           type="button"
           onClick={() => { onMinChange(0); onMaxChange(100); }}
-          className={`px-2 py-0.5 text-xs rounded transition-colors ${min === 0 && max === 100 ? colorClasses[color].bg + ' text-white' : 'bg-gray-700 hover:bg-gray-600 text-gray-300'}`}
+          className={`px-2 py-0.5 text-xs rounded transition-colors ${min === 0 && max === 100 ? colors.bg + ' text-white' : 'bg-gray-700 hover:bg-gray-600 text-gray-300'}`}
         >
           All
         </button>
         <button
           type="button"
           onClick={() => { onMinChange(0); onMaxChange(10); }}
-          className={`px-2 py-0.5 text-xs rounded transition-colors ${min === 0 && max === 10 ? colorClasses[color].bg + ' text-white' : 'bg-gray-700 hover:bg-gray-600 text-gray-300'}`}
+          className={`px-2 py-0.5 text-xs rounded transition-colors ${min === 0 && max === 10 ? colors.bg + ' text-white' : 'bg-gray-700 hover:bg-gray-600 text-gray-300'}`}
         >
           0-10%
         </button>
         <button
           type="button"
           onClick={() => { onMinChange(90); onMaxChange(100); }}
-          className={`px-2 py-0.5 text-xs rounded transition-colors ${min === 90 && max === 100 ? colorClasses[color].bg + ' text-white' : 'bg-gray-700 hover:bg-gray-600 text-gray-300'}`}
+          className={`px-2 py-0.5 text-xs rounded transition-colors ${min === 90 && max === 100 ? colors.bg + ' text-white' : 'bg-gray-700 hover:bg-gray-600 text-gray-300'}`}
         >
           90-100%
         </button>
         <button
           type="button"
           onClick={() => { onMinChange(40); onMaxChange(60); }}
-          className={`px-2 py-0.5 text-xs rounded transition-colors ${min === 40 && max === 60 ? colorClasses[color].bg + ' text-white' : 'bg-gray-700 hover:bg-gray-600 text-gray-300'}`}
+          className={`px-2 py-0.5 text-xs rounded transition-colors ${min === 40 && max === 60 ? colors.bg + ' text-white' : 'bg-gray-700 hover:bg-gray-600 text-gray-300'}`}
         >
           40-60%
         </button>
