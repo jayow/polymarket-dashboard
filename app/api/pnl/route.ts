@@ -3,11 +3,11 @@ import { NextResponse } from 'next/server'
 // Mark route as dynamic
 export const dynamic = 'force-dynamic'
 
-const DATA_API_POSITIONS_ENDPOINT = 'https://data-api.polymarket.com/positions'
-const DATA_API_CLOSED_POSITIONS_ENDPOINT = 'https://data-api.polymarket.com/closed-positions'
+// Official Polymarket PNL endpoint
+const USER_PNL_ENDPOINT = 'https://user-pnl-api.polymarket.com/user-pnl'
 
-// Get User All-Time PNL from Polymarket
-// Sums: realizedPnl from closed positions + cashPnl from current positions
+// Get User All-Time PNL from Polymarket's official PNL API
+// Returns time-series PNL data, we extract the latest value
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url)
@@ -20,66 +20,33 @@ export async function GET(request: Request) {
       )
     }
 
-    // Fetch current positions
-    const currentResponse = await fetch(`${DATA_API_POSITIONS_ENDPOINT}?user=${walletAddress}`, {
+    // Fetch from Polymarket's official PNL API
+    const response = await fetch(`${USER_PNL_ENDPOINT}?user_address=${walletAddress}`, {
       method: 'GET',
       headers: { 'Content-Type': 'application/json' },
       next: { revalidate: 60 },
     })
 
-    // Fetch all closed positions with pagination (max 10000 per request per docs)
-    let allClosedPositions: any[] = []
-    let offset = 0
-    const limit = 10000  // API allows up to 10000
-    let hasMore = true
-
-    while (hasMore) {
-      const closedResponse = await fetch(`${DATA_API_CLOSED_POSITIONS_ENDPOINT}?user=${walletAddress}&limit=${limit}&offset=${offset}`, {
-        method: 'GET',
-        headers: { 'Content-Type': 'application/json' },
-        next: { revalidate: 60 },
+    if (!response.ok) {
+      // Return null if user has no PNL data
+      return NextResponse.json({ allTimePnL: null }, {
+        headers: {
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Methods': 'GET',
+          'Access-Control-Allow-Headers': 'Content-Type',
+        },
       })
-
-      if (!closedResponse.ok) {
-        break
-      }
-
-      const closedPositions = await closedResponse.json()
-      if (!Array.isArray(closedPositions) || closedPositions.length === 0) {
-        hasMore = false
-      } else {
-        allClosedPositions.push(...closedPositions)
-        offset += limit
-        // If we got fewer than the limit, we've reached the end
-        if (closedPositions.length < limit) {
-          hasMore = false
-        }
-      }
     }
 
-    // Process current positions (unrealized PNL)
-    let unrealizedPnL = 0
-    if (currentResponse.ok) {
-      const currentPositions = await currentResponse.json()
-      if (Array.isArray(currentPositions)) {
-        unrealizedPnL = currentPositions.reduce((sum, position) => {
-          const cashPnl = position.cashPnl ?? 0
-          return sum + (typeof cashPnl === 'number' ? cashPnl : 0)
-        }, 0)
-      }
+    const pnlData = await response.json()
+    
+    // The API returns an array of {t: timestamp, p: pnl} objects
+    // Get the latest (last) PNL value
+    let allTimePnL = null
+    if (Array.isArray(pnlData) && pnlData.length > 0) {
+      const latestEntry = pnlData[pnlData.length - 1]
+      allTimePnL = latestEntry.p ?? null
     }
-
-    // Process closed positions (realized PNL)
-    let realizedPnL = 0
-    if (allClosedPositions.length > 0) {
-      realizedPnL = allClosedPositions.reduce((sum, position) => {
-        const pnl = position.realizedPnl ?? 0
-        return sum + (typeof pnl === 'number' ? pnl : 0)
-      }, 0)
-    }
-
-    // Total all-time PNL = realized (from closed) + unrealized (from current)
-    const allTimePnL = realizedPnL + unrealizedPnL
     
     return NextResponse.json({ allTimePnL }, {
       headers: {
