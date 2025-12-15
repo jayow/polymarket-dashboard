@@ -27,10 +27,10 @@ export async function GET(request: Request) {
       next: { revalidate: 60 },
     })
 
-    // Fetch all closed positions with pagination (max 500 per request)
+    // Fetch all closed positions with pagination (max 10000 per request per docs)
     let allClosedPositions: any[] = []
     let offset = 0
-    const limit = 500
+    const limit = 10000  // API allows up to 10000
     let hasMore = true
 
     while (hasMore) {
