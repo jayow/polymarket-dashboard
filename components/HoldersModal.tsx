@@ -1,7 +1,7 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { Holder, HoldersResponse, fetchMarketHolders } from '@/lib/polymarket-api'
+import { useState, useEffect, useMemo } from 'react'
+import { Holder, HoldersResponse, fetchMarketHolders, fetchUserPnL } from '@/lib/polymarket-api'
 import { formatCurrency } from '@/lib/utils'
 
 interface HoldersModalProps {
@@ -15,10 +15,16 @@ export default function HoldersModal({ isOpen, onClose, marketId, marketQuestion
   const [holdersData, setHoldersData] = useState<HoldersResponse | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [pnlMap, setPnlMap] = useState<Map<string, number | null>>(new Map())
+  const [loadingPnL, setLoadingPnL] = useState(false)
 
   useEffect(() => {
     if (isOpen && marketId) {
       loadHolders()
+    } else {
+      // Reset when modal closes
+      setHoldersData(null)
+      setPnlMap(new Map())
     }
   }, [isOpen, marketId])
 
@@ -30,18 +36,53 @@ export default function HoldersModal({ isOpen, onClose, marketId, marketQuestion
       const data = await fetchMarketHolders(marketId, 500)
       setHoldersData(data)
       
-      // Debug: Log sample holder data to check fields
-      if (data.yesHolders.length > 0) {
-        console.log('Sample YES holder data:', data.yesHolders[0])
-      }
-      if (data.noHolders.length > 0) {
-        console.log('Sample NO holder data:', data.noHolders[0])
+      // Fetch PNL for all holders after holders are loaded
+      if (data.yesHolders.length > 0 || data.noHolders.length > 0) {
+        loadPnLForHolders(data)
       }
     } catch (err: any) {
       setError(err.message || 'Failed to load holders')
     } finally {
       setLoading(false)
     }
+  }
+
+  const loadPnLForHolders = async (data: HoldersResponse) => {
+    setLoadingPnL(true)
+    const allHolders = [...data.yesHolders, ...data.noHolders]
+    const uniqueWallets = Array.from(new Set(allHolders.map(h => h.proxyWallet)))
+    
+    // Fetch PNL in batches of 10 to avoid overwhelming the API
+    const batchSize = 10
+    const pnlResults = new Map<string, number | null>()
+    
+    for (let i = 0; i < uniqueWallets.length; i += batchSize) {
+      const batch = uniqueWallets.slice(i, i + batchSize)
+      const promises = batch.map(async (wallet) => {
+        try {
+          const pnl = await fetchUserPnL(wallet)
+          return { wallet, pnl }
+        } catch (err) {
+          console.error(`Error fetching PNL for ${wallet}:`, err)
+          return { wallet, pnl: null }
+        }
+      })
+      
+      const results = await Promise.allSettled(promises)
+      results.forEach((result) => {
+        if (result.status === 'fulfilled') {
+          pnlResults.set(result.value.wallet, result.value.pnl)
+        }
+      })
+      
+      // Small delay between batches to avoid rate limiting
+      if (i + batchSize < uniqueWallets.length) {
+        await new Promise(resolve => setTimeout(resolve, 100))
+      }
+    }
+    
+    setPnlMap(pnlResults)
+    setLoadingPnL(false)
   }
 
   if (!isOpen) return null
@@ -106,6 +147,8 @@ export default function HoldersModal({ isOpen, onClose, marketId, marketQuestion
                         holder={holder} 
                         rank={index + 1}
                         variant="yes"
+                        pnl={pnlMap.get(holder.proxyWallet) ?? undefined}
+                        loadingPnL={loadingPnL}
                       />
                     ))
                   ) : (
@@ -131,6 +174,8 @@ export default function HoldersModal({ isOpen, onClose, marketId, marketQuestion
                         holder={holder} 
                         rank={index + 1}
                         variant="no"
+                        pnl={pnlMap.get(holder.proxyWallet) ?? undefined}
+                        loadingPnL={loadingPnL}
                       />
                     ))
                   ) : (
@@ -147,7 +192,9 @@ export default function HoldersModal({ isOpen, onClose, marketId, marketQuestion
         {/* Footer */}
         <div className="border-t border-gray-700 p-4 text-center">
           <p className="text-xs text-gray-500">
-            Showing {holdersData?.yesHolders?.length || 0} YES holders and {holdersData?.noHolders?.length || 0} NO holders (API max: 500 each) • Data from Polymarket
+            Showing {holdersData?.yesHolders?.length || 0} YES holders and {holdersData?.noHolders?.length || 0} NO holders (API max: 500 each)
+            {loadingPnL && <span className="ml-2 text-blue-400">• Loading PNL data...</span>}
+            {!loadingPnL && <span> • Data from Polymarket</span>}
           </p>
         </div>
       </div>
@@ -155,7 +202,13 @@ export default function HoldersModal({ isOpen, onClose, marketId, marketQuestion
   )
 }
 
-function HolderRow({ holder, rank, variant }: { holder: Holder; rank: number; variant: 'yes' | 'no' }) {
+function HolderRow({ holder, rank, variant, pnl, loadingPnL }: { 
+  holder: Holder
+  rank: number
+  variant: 'yes' | 'no'
+  pnl?: number | null
+  loadingPnL?: boolean
+}) {
   // Polymarket UI prioritizes name (username) over pseudonym, then falls back to shortened address
   // This matches how Polymarket displays holder names on their UI
   const displayName = holder.name || holder.pseudonym || shortenAddress(holder.proxyWallet)
@@ -163,11 +216,8 @@ function HolderRow({ holder, rank, variant }: { holder: Holder; rank: number; va
   const variantColor = variant === 'yes' ? 'green' : 'red'
   const profileUrl = buildProfileUrl(holder)
 
-  // Get PNL value - prefer cashPnl (USD), fallback to pnl, then percentPnl (percentage)
-  const cashPnl = holder.cashPnl ?? holder.pnl
-  const hasCashPnl = cashPnl !== undefined && cashPnl !== null
-  const percentPnl = holder.percentPnl
-  const hasPercentPnl = percentPnl !== undefined && percentPnl !== null
+  // Use fetched PNL data (all-time PNL from positions API)
+  const hasPnl = pnl !== undefined && pnl !== null
 
   return (
     <div className="flex items-center gap-3 p-3 bg-gray-800/50 rounded-lg hover:bg-gray-800 transition-colors">
@@ -208,18 +258,14 @@ function HolderRow({ holder, rank, variant }: { holder: Holder; rank: number; va
           {formatShareAmount(holder.amount)}
         </div>
         <div className="text-xs text-gray-400">shares</div>
-        {hasCashPnl && (
-          <div className={`text-xs font-medium mt-1 ${
-            cashPnl >= 0 ? 'text-green-400' : 'text-red-400'
-          }`}>
-            {formatCurrency(cashPnl)}
-          </div>
+        {loadingPnL && !hasPnl && (
+          <div className="text-xs text-gray-500 mt-1">—</div>
         )}
-        {!hasCashPnl && hasPercentPnl && (
+        {!loadingPnL && hasPnl && (
           <div className={`text-xs font-medium mt-1 ${
-            percentPnl >= 0 ? 'text-green-400' : 'text-red-400'
+            pnl >= 0 ? 'text-green-400' : 'text-red-400'
           }`}>
-            {percentPnl > 0 ? '+' : ''}{percentPnl.toFixed(2)}%
+            {formatCurrency(pnl)}
           </div>
         )}
       </div>

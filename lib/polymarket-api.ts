@@ -580,6 +580,63 @@ function transformSingleMarket(market: any, event: any, eventTags?: string[]): M
   };
 }
 
+// Position interface for PNL data
+export interface Position {
+  proxyWallet: string;
+  asset?: string;
+  conditionId?: string;
+  size?: number;
+  avgPrice?: number;
+  initialValue?: number;
+  currentValue?: number;
+  cashPnl?: number;
+  percentPnl?: number;
+  totalBought?: number;
+  realizedPnl?: number;
+  percentRealizedPnl?: number;
+  curPrice?: number;
+  redeemable?: boolean;
+  mergeable?: boolean;
+  title?: string;
+  slug?: string;
+  icon?: string;
+  eventSlug?: string;
+  outcome?: string;
+  outcomeIndex?: number;
+  oppositeOutcome?: string;
+  oppositeAsset?: string;
+  endDate?: string;
+  negativeRisk?: boolean;
+}
+
+// Fetch all-time PNL for a user (sum of all positions)
+export async function fetchUserPnL(walletAddress: string): Promise<number | null> {
+  try {
+    const response = await fetch(`/api/positions?user=${walletAddress}`)
+    
+    if (!response.ok) {
+      return null
+    }
+    
+    const positions: Position[] = await response.json()
+    
+    if (!Array.isArray(positions) || positions.length === 0) {
+      return null
+    }
+    
+    // Sum up cashPnl from all positions to get total all-time PNL
+    const totalPnL = positions.reduce((sum, position) => {
+      const pnl = position.cashPnl ?? position.realizedPnl ?? 0
+      return sum + (typeof pnl === 'number' ? pnl : 0)
+    }, 0)
+    
+    return totalPnL
+  } catch (error) {
+    console.error(`Error fetching PNL for ${walletAddress}:`, error)
+    return null
+  }
+}
+
 // Fetch holders for a specific market
 // Note: Polymarket API maximum limit is 500 holders per request
 export async function fetchMarketHolders(conditionId: string, limit: number = 500): Promise<HoldersResponse> {
