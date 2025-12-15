@@ -4,9 +4,10 @@ import { NextResponse } from 'next/server'
 export const dynamic = 'force-dynamic'
 
 const DATA_API_POSITIONS_ENDPOINT = 'https://data-api.polymarket.com/positions'
+const DATA_API_CLOSED_POSITIONS_ENDPOINT = 'https://data-api.polymarket.com/closed-positions'
 
-// Get User All-Time PNL from Polymarket positions
-// Sums cashPnl (unrealized) + realizedPnl (realized) from all positions
+// Get User All-Time PNL from Polymarket
+// Sums: realizedPnl from closed positions + cashPnl from current positions
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url)
@@ -19,40 +20,46 @@ export async function GET(request: Request) {
       )
     }
 
-    // Fetch all positions for the user
-    const url = `${DATA_API_POSITIONS_ENDPOINT}?user=${walletAddress}`
-    
-    const response = await fetch(url, {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      // Cache for 1 minute (positions change frequently)
-      next: { revalidate: 60 },
-    })
+    // Fetch both current and closed positions in parallel
+    const [currentResponse, closedResponse] = await Promise.all([
+      fetch(`${DATA_API_POSITIONS_ENDPOINT}?user=${walletAddress}`, {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json' },
+        next: { revalidate: 60 },
+      }),
+      fetch(`${DATA_API_CLOSED_POSITIONS_ENDPOINT}?user=${walletAddress}`, {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json' },
+        next: { revalidate: 60 },
+      }),
+    ])
 
-    if (!response.ok) {
-      // If user has no positions, return null instead of error
-      if (response.status === 404 || response.status === 400) {
-        return NextResponse.json({ allTimePnL: null })
+    // Process current positions (unrealized PNL)
+    let unrealizedPnL = 0
+    if (currentResponse.ok) {
+      const currentPositions = await currentResponse.json()
+      if (Array.isArray(currentPositions)) {
+        unrealizedPnL = currentPositions.reduce((sum, position) => {
+          const cashPnl = position.cashPnl ?? 0
+          return sum + (typeof cashPnl === 'number' ? cashPnl : 0)
+        }, 0)
       }
-      throw new Error(`HTTP ${response.status}: ${response.statusText}`)
     }
 
-    const positions = await response.json()
-    
-    if (!Array.isArray(positions) || positions.length === 0) {
-      return NextResponse.json({ allTimePnL: null })
+    // Process closed positions (realized PNL)
+    let realizedPnL = 0
+    if (closedResponse.ok) {
+      const closedPositions = await closedResponse.json()
+      if (Array.isArray(closedPositions)) {
+        realizedPnL = closedPositions.reduce((sum, position) => {
+          const pnl = position.realizedPnl ?? 0
+          return sum + (typeof pnl === 'number' ? pnl : 0)
+        }, 0)
+      }
     }
-    
-    // Sum up both cashPnl (unrealized) and realizedPnl (realized) for total all-time PNL
-    // cashPnl = unrealized profit/loss from open positions
-    // realizedPnl = realized profit/loss from closed positions
-    const allTimePnL = positions.reduce((sum, position) => {
-      const cashPnl = position.cashPnl ?? 0
-      const realizedPnl = position.realizedPnl ?? 0
-      return sum + (typeof cashPnl === 'number' ? cashPnl : 0) + (typeof realizedPnl === 'number' ? realizedPnl : 0)
-    }, 0)
+
+    // Total all-time PNL = realized (from closed) + unrealized (from current)
+    const allTimePnL = realizedPnL + unrealizedPnL
     
     return NextResponse.json({ allTimePnL }, {
       headers: {
@@ -64,7 +71,6 @@ export async function GET(request: Request) {
     })
   } catch (error: any) {
     console.error('Error fetching PNL:', error)
-    // Return null on error instead of failing
     return NextResponse.json({ allTimePnL: null })
   }
 }
