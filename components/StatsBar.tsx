@@ -21,8 +21,8 @@ export default function StatsBar({ totalVolume, totalLiquidity, activeMarkets }:
         <div className="relative p-6">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-blue-200/80 text-sm font-medium mb-1">Total Volume</p>
-              <p className="text-3xl font-bold text-white tracking-tight">{formatCurrency(totalVolume)}</p>
+              <p className="text-blue-200/80 text-xs font-semibold uppercase tracking-wider mb-1.5">Total Volume</p>
+              <p className="text-3xl font-bold text-white tracking-tight leading-none">{formatCurrency(totalVolume)}</p>
             </div>
             {/* Modern Icon */}
             <div className="w-14 h-14 rounded-xl bg-white/10 backdrop-blur-sm flex items-center justify-center border border-white/10">
@@ -55,8 +55,8 @@ export default function StatsBar({ totalVolume, totalLiquidity, activeMarkets }:
         <div className="relative p-6">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-emerald-200/80 text-sm font-medium mb-1">Total Liquidity</p>
-              <p className="text-3xl font-bold text-white tracking-tight">{formatCurrency(totalLiquidity)}</p>
+              <p className="text-emerald-200/80 text-xs font-semibold uppercase tracking-wider mb-1.5">Total Liquidity</p>
+              <p className="text-3xl font-bold text-white tracking-tight leading-none">{formatCurrency(totalLiquidity)}</p>
             </div>
             {/* Modern Icon */}
             <div className="w-14 h-14 rounded-xl bg-white/10 backdrop-blur-sm flex items-center justify-center border border-white/10">
@@ -91,8 +91,8 @@ export default function StatsBar({ totalVolume, totalLiquidity, activeMarkets }:
         <div className="relative p-6">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-rose-200/80 text-sm font-medium mb-1">Active Markets</p>
-              <p className="text-3xl font-bold text-white tracking-tight">{activeMarkets.toLocaleString()}</p>
+              <p className="text-rose-200/80 text-xs font-semibold uppercase tracking-wider mb-1.5">Active Markets</p>
+              <p className="text-3xl font-bold text-white tracking-tight leading-none">{activeMarkets.toLocaleString()}</p>
             </div>
             {/* Modern Icon */}
             <div className="w-14 h-14 rounded-xl bg-white/10 backdrop-blur-sm flex items-center justify-center border border-white/10">
