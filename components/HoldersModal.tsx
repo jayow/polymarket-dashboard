@@ -262,10 +262,13 @@ function HolderRow({ holder, rank, variant, pnl, loadingPnL }: {
           <div className="text-xs text-gray-500 mt-1">—</div>
         )}
         {!loadingPnL && hasPnl && (
-          <div className={`text-xs font-medium mt-1 ${
-            pnl >= 0 ? 'text-green-400' : 'text-red-400'
-          }`}>
-            {formatCurrency(pnl)}
+          <div className="mt-1">
+            <div className={`text-xs font-medium ${
+              pnl >= 0 ? 'text-green-400' : 'text-red-400'
+            }`}>
+              {formatCurrency(pnl)}
+            </div>
+            <div className="text-[10px] text-gray-500">all-time PNL</div>
           </div>
         )}
       </div>

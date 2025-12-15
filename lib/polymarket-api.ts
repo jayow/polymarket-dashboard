@@ -609,7 +609,8 @@ export interface Position {
   negativeRisk?: boolean;
 }
 
-// Fetch all-time PNL for a user (sum of all positions)
+// Fetch all-time PNL for a user (sum of all positions across all markets)
+// cashPnl includes both realized and unrealized PNL, representing total all-time performance
 export async function fetchUserPnL(walletAddress: string): Promise<number | null> {
   try {
     const response = await fetch(`/api/positions?user=${walletAddress}`)
@@ -625,6 +626,7 @@ export async function fetchUserPnL(walletAddress: string): Promise<number | null
     }
     
     // Sum up cashPnl from all positions to get total all-time PNL
+    // cashPnl includes both realized (closed positions) and unrealized (open positions) PNL
     const totalPnL = positions.reduce((sum, position) => {
       const pnl = position.cashPnl ?? position.realizedPnl ?? 0
       return sum + (typeof pnl === 'number' ? pnl : 0)
