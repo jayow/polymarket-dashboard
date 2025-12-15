@@ -15,7 +15,6 @@ export default function HoldersModal({ isOpen, onClose, marketId, marketQuestion
   const [holdersData, setHoldersData] = useState<HoldersResponse | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [activeTab, setActiveTab] = useState<'yes' | 'no'>('yes')
 
   useEffect(() => {
     if (isOpen && marketId) {
@@ -39,8 +38,6 @@ export default function HoldersModal({ isOpen, onClose, marketId, marketQuestion
 
   if (!isOpen) return null
 
-  const currentHolders = activeTab === 'yes' ? holdersData?.yesHolders : holdersData?.noHolders
-
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       {/* Backdrop */}
@@ -50,7 +47,7 @@ export default function HoldersModal({ isOpen, onClose, marketId, marketQuestion
       />
       
       {/* Modal */}
-      <div className="relative bg-polymarket-dark border border-gray-700 rounded-xl w-full max-w-2xl max-h-[80vh] overflow-hidden shadow-2xl">
+      <div className="relative bg-polymarket-dark border border-gray-700 rounded-xl w-full max-w-7xl max-h-[85vh] overflow-hidden shadow-2xl">
         {/* Header */}
         <div className="border-b border-gray-700 p-4">
           <div className="flex items-center justify-between">
@@ -67,32 +64,8 @@ export default function HoldersModal({ isOpen, onClose, marketId, marketQuestion
           <p className="text-sm text-gray-400 mt-1 line-clamp-2">{marketQuestion}</p>
         </div>
 
-        {/* Tabs */}
-        <div className="flex border-b border-gray-700">
-          <button
-            onClick={() => setActiveTab('yes')}
-            className={`flex-1 py-3 px-4 text-sm font-medium transition-colors ${
-              activeTab === 'yes'
-                ? 'text-green-400 border-b-2 border-green-400 bg-green-400/10'
-                : 'text-gray-400 hover:text-white'
-            }`}
-          >
-            YES Holders ({holdersData?.yesCount || 0})
-          </button>
-          <button
-            onClick={() => setActiveTab('no')}
-            className={`flex-1 py-3 px-4 text-sm font-medium transition-colors ${
-              activeTab === 'no'
-                ? 'text-red-400 border-b-2 border-red-400 bg-red-400/10'
-                : 'text-gray-400 hover:text-white'
-            }`}
-          >
-            NO Holders ({holdersData?.noCount || 0})
-          </button>
-        </div>
-
-        {/* Content */}
-        <div className="overflow-y-auto max-h-[50vh] p-4">
+        {/* Content - Side by Side */}
+        <div className="overflow-y-auto max-h-[60vh]">
           {loading ? (
             <div className="flex items-center justify-center py-12">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-polymarket-blue"></div>
@@ -108,15 +81,57 @@ export default function HoldersModal({ isOpen, onClose, marketId, marketQuestion
                 Retry
               </button>
             </div>
-          ) : currentHolders && currentHolders.length > 0 ? (
-            <div className="space-y-2">
-              {currentHolders.map((holder, index) => (
-                <HolderRow key={holder.proxyWallet || index} holder={holder} rank={index + 1} />
-              ))}
-            </div>
           ) : (
-            <div className="text-center py-12 text-gray-400">
-              No {activeTab === 'yes' ? 'YES' : 'NO'} holders found
+            <div className="grid grid-cols-2 gap-4 p-4">
+              {/* YES Holders Column */}
+              <div className="space-y-3">
+                <div className="sticky top-0 bg-polymarket-dark pb-2 border-b border-green-400/30">
+                  <h3 className="text-sm font-semibold text-green-400 uppercase tracking-wider">
+                    YES Holders ({holdersData?.yesCount || 0})
+                  </h3>
+                </div>
+                <div className="space-y-2">
+                  {holdersData?.yesHolders && holdersData.yesHolders.length > 0 ? (
+                    holdersData.yesHolders.map((holder, index) => (
+                      <HolderRow 
+                        key={holder.proxyWallet || `yes-${index}`} 
+                        holder={holder} 
+                        rank={index + 1}
+                        variant="yes"
+                      />
+                    ))
+                  ) : (
+                    <div className="text-center py-8 text-gray-500 text-sm">
+                      No YES holders found
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* NO Holders Column */}
+              <div className="space-y-3">
+                <div className="sticky top-0 bg-polymarket-dark pb-2 border-b border-red-400/30">
+                  <h3 className="text-sm font-semibold text-red-400 uppercase tracking-wider">
+                    NO Holders ({holdersData?.noCount || 0})
+                  </h3>
+                </div>
+                <div className="space-y-2">
+                  {holdersData?.noHolders && holdersData.noHolders.length > 0 ? (
+                    holdersData.noHolders.map((holder, index) => (
+                      <HolderRow 
+                        key={holder.proxyWallet || `no-${index}`} 
+                        holder={holder} 
+                        rank={index + 1}
+                        variant="no"
+                      />
+                    ))
+                  ) : (
+                    <div className="text-center py-8 text-gray-500 text-sm">
+                      No NO holders found
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
           )}
         </div>
@@ -124,7 +139,7 @@ export default function HoldersModal({ isOpen, onClose, marketId, marketQuestion
         {/* Footer */}
         <div className="border-t border-gray-700 p-4 text-center">
           <p className="text-xs text-gray-500">
-            Showing {currentHolders?.length || 0} holders (API max: 500) • Data from Polymarket
+            Showing {holdersData?.yesHolders?.length || 0} YES holders and {holdersData?.noHolders?.length || 0} NO holders (API max: 500 each) • Data from Polymarket
           </p>
         </div>
       </div>
@@ -132,9 +147,10 @@ export default function HoldersModal({ isOpen, onClose, marketId, marketQuestion
   )
 }
 
-function HolderRow({ holder, rank }: { holder: Holder; rank: number }) {
+function HolderRow({ holder, rank, variant }: { holder: Holder; rank: number; variant: 'yes' | 'no' }) {
   const displayName = holder.pseudonym || holder.name || shortenAddress(holder.proxyWallet)
   const showBadge = rank <= 3
+  const variantColor = variant === 'yes' ? 'green' : 'red'
 
   return (
     <div className="flex items-center gap-3 p-3 bg-gray-800/50 rounded-lg hover:bg-gray-800 transition-colors">
@@ -156,7 +172,11 @@ function HolderRow({ holder, rank }: { holder: Holder; rank: number }) {
           className="w-10 h-10 rounded-full object-cover"
         />
       ) : (
-        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
+        <div className={`w-10 h-10 rounded-full bg-gradient-to-br ${
+          variant === 'yes' 
+            ? 'from-green-500 to-emerald-600' 
+            : 'from-red-500 to-rose-600'
+        } flex items-center justify-center`}>
           <span className="text-white font-bold text-sm">
             {displayName.charAt(0).toUpperCase()}
           </span>
@@ -178,7 +198,7 @@ function HolderRow({ holder, rank }: { holder: Holder; rank: number }) {
 
       {/* Amount */}
       <div className="text-right">
-        <div className="font-semibold text-white">
+        <div className={`font-semibold ${variant === 'yes' ? 'text-green-400' : 'text-red-400'}`}>
           {formatShareAmount(holder.amount)}
         </div>
         <div className="text-xs text-gray-400">shares</div>
@@ -200,4 +220,3 @@ function formatShareAmount(amount: number): string {
     maximumFractionDigits: 2 
   })
 }
-
