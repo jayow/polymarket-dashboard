@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 
 export type SortOrder = 'asc' | 'desc'
 export type SortField = 'endDate' | 'volume' | 'liquidity' | 'price' | 'daysUntil'
@@ -79,8 +79,8 @@ function DualRangeSlider({
   onMaxChange: (value: number) => void
   color?: 'blue' | 'green' | 'red'
 }) {
-  const minRef = React.useRef<HTMLInputElement>(null)
-  const maxRef = React.useRef<HTMLInputElement>(null)
+  const minRef = useRef<HTMLInputElement>(null)
+  const maxRef = useRef<HTMLInputElement>(null)
   
   const colorClasses = {
     blue: { bg: 'bg-blue-500', border: 'border-blue-500' },
