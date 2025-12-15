@@ -67,6 +67,7 @@ export default function MarketCard({ market }: MarketCardProps) {
           rel="noopener noreferrer"
           className="group-hover:text-polymarket-blue transition-colors hover:underline cursor-pointer"
           onClick={(e) => {
+            e.preventDefault()
             e.stopPropagation()
             window.open(`https://polymarket.com/event/${market.eventSlug || market.slug}`, '_blank', 'noopener,noreferrer')
           }}
