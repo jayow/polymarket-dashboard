@@ -29,7 +29,7 @@ export default function Home() {
   const [maxYesPrice, setMaxYesPrice] = useState<number>(100)
   const [minNoPrice, setMinNoPrice] = useState<number>(0)
   const [maxNoPrice, setMaxNoPrice] = useState<number>(100)
-  const [maxHoursUntil, setMaxHoursUntil] = useState<number | null>(null)
+  const [maxHoursUntil, setMaxHoursUntil] = useState<number | null>(24) // Default to "less than 1 day" for faster initial load
   const [maxSpread, setMaxSpread] = useState<number | null>(null)
   const [minBidUSD, setMinBidUSD] = useState<number | null>(null)
   const [minAskUSD, setMinAskUSD] = useState<number | null>(null)
