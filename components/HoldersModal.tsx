@@ -196,7 +196,15 @@ function HolderRow({ holder, rank, variant }: { holder: Holder; rank: number; va
       {/* Info */}
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2">
-          <span className="font-medium text-white truncate">{displayName}</span>
+          <a
+            href={`https://polymarket.com/account/${holder.proxyWallet}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="font-medium text-white truncate hover:text-polymarket-blue hover:underline transition-colors"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {displayName}
+          </a>
           {holder.displayUsernamePublic && holder.pseudonym && (
             <span className="text-xs text-green-400">✓</span>
           )}
