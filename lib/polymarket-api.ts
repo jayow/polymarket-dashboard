@@ -36,7 +36,7 @@ export interface Market {
   // Additional fields
   description?: string;
   category?: string;
-  tags?: string[];
+  tags?: (string | { id?: string; label: string; slug?: string })[];
   marketType?: string;
   fee?: number;
   totalSupply?: number;
