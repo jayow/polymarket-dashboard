@@ -541,8 +541,7 @@ function transformSingleMarket(market: any, event: any, eventTags?: string[]): M
       return undefined
     })(),
     // All tags/categories for multi-category support
-    tags: eventTagsArray.length > 0 ? eventTagsArray : undefined,
-    tags: event.tags || market.tags || [],
+    tags: eventTagsArray.length > 0 ? eventTagsArray : (event.tags || market.tags || []),
     marketType: market.marketType || 'binary',
     fee: parseFloat(market.fee) || 0,
     totalSupply: 0,
