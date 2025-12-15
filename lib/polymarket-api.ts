@@ -191,8 +191,9 @@ export async function fetchEvents(eventLimit: number | null = 1000, useCache: bo
     }
   }
   
-  // Fetch fresh data
-  return fetchEventsInternal(eventLimit, useCache)
+  // Fetch fresh data - assign to activeFetchPromise for request deduplication
+  activeFetchPromise = fetchEventsInternal(eventLimit, useCache)
+  return activeFetchPromise
 }
 
 // Internal fetch function (separated for reuse)
