@@ -156,11 +156,11 @@ function DualRangeSlider({
   }
   
   return (
-    <div>
-      <label className="block text-sm text-gray-400 mb-2">{label}</label>
+    <div className="space-y-2">
+      <label className="block text-sm text-gray-400">{label}</label>
       
       {/* Value display with editable inputs */}
-      <div className="flex items-center gap-2 mb-3">
+      <div className="flex items-center gap-3">
         <input
           type="number"
           min="0"
@@ -223,8 +223,9 @@ function DualRangeSlider({
         />
       </div>
       
-      {/* Quick select buttons */}
-      <div className="flex gap-1 flex-wrap">
+      {/* Quick select buttons - with proper spacing */}
+      <div className="flex gap-2 flex-wrap mt-1">
+        <span className="text-xs text-gray-500">Quick:</span>
         <button
           type="button"
           onClick={() => { onMinChange(0); onMaxChange(100); }}
