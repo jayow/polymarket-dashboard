@@ -163,6 +163,12 @@ function HolderRow({ holder, rank, variant }: { holder: Holder; rank: number; va
   const variantColor = variant === 'yes' ? 'green' : 'red'
   const profileUrl = buildProfileUrl(holder)
 
+  // Get PNL value - prefer cashPnl (USD), fallback to pnl, then percentPnl (percentage)
+  const cashPnl = holder.cashPnl ?? holder.pnl
+  const hasCashPnl = cashPnl !== undefined && cashPnl !== null
+  const percentPnl = holder.percentPnl
+  const hasPercentPnl = percentPnl !== undefined && percentPnl !== null
+
   return (
     <div className="flex items-center gap-3 p-3 bg-gray-800/50 rounded-lg hover:bg-gray-800 transition-colors">
       {/* Rank */}
@@ -174,25 +180,6 @@ function HolderRow({ holder, rank, variant }: { holder: Holder; rank: number; va
       }`}>
         {rank}
       </div>
-
-      {/* Profile Image */}
-      {holder.profileImage || holder.profileImageOptimized ? (
-        <img
-          src={holder.profileImageOptimized || holder.profileImage}
-          alt={displayName}
-          className="w-10 h-10 rounded-full object-cover"
-        />
-      ) : (
-        <div className={`w-10 h-10 rounded-full bg-gradient-to-br ${
-          variant === 'yes' 
-            ? 'from-green-500 to-emerald-600' 
-            : 'from-red-500 to-rose-600'
-        } flex items-center justify-center`}>
-          <span className="text-white font-bold text-sm">
-            {displayName.charAt(0).toUpperCase()}
-          </span>
-        </div>
-      )}
 
       {/* Info */}
       <div className="flex-1 min-w-0">
@@ -215,12 +202,26 @@ function HolderRow({ holder, rank, variant }: { holder: Holder; rank: number; va
         )}
       </div>
 
-      {/* Amount */}
-      <div className="text-right">
+      {/* Amount and PNL */}
+      <div className="text-right space-y-1">
         <div className={`font-semibold ${variant === 'yes' ? 'text-green-400' : 'text-red-400'}`}>
           {formatShareAmount(holder.amount)}
         </div>
         <div className="text-xs text-gray-400">shares</div>
+        {hasCashPnl && (
+          <div className={`text-xs font-medium mt-1 ${
+            cashPnl >= 0 ? 'text-green-400' : 'text-red-400'
+          }`}>
+            {formatCurrency(cashPnl)}
+          </div>
+        )}
+        {!hasCashPnl && hasPercentPnl && (
+          <div className={`text-xs font-medium mt-1 ${
+            percentPnl >= 0 ? 'text-green-400' : 'text-red-400'
+          }`}>
+            {percentPnl > 0 ? '+' : ''}{percentPnl.toFixed(2)}%
+          </div>
+        )}
       </div>
     </div>
   )

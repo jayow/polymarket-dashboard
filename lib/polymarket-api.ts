@@ -75,6 +75,10 @@ export interface Holder {
   name?: string;
   profileImage?: string;
   profileImageOptimized?: string;
+  // PNL fields (if available from API)
+  cashPnl?: number;
+  percentPnl?: number;
+  pnl?: number;
 }
 
 export interface TokenHolders {
