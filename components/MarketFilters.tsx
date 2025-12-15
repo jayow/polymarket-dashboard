@@ -164,11 +164,16 @@ function DualRangeSlider({
         <input
           type="number"
           min="0"
-          max="99"
+          max="100"
           value={min}
           onChange={(e) => {
-            const val = Math.max(0, Math.min(99, parseInt(e.target.value) || 0))
-            if (val < max) onMinChange(val)
+            // Allow free typing - clamp to valid range
+            const val = Math.max(0, Math.min(100, parseInt(e.target.value) || 0))
+            onMinChange(val)
+          }}
+          onBlur={() => {
+            // On blur, ensure min < max
+            if (min >= max) onMinChange(Math.max(0, max - 1))
           }}
           className={`w-14 bg-gray-800 border ${colors.border} rounded px-2 py-1 text-white text-center text-sm font-mono`}
         />
@@ -212,12 +217,17 @@ function DualRangeSlider({
         
         <input
           type="number"
-          min="1"
+          min="0"
           max="100"
           value={max}
           onChange={(e) => {
-            const val = Math.max(1, Math.min(100, parseInt(e.target.value) || 100))
-            if (val > min) onMaxChange(val)
+            // Allow free typing - clamp to valid range
+            const val = Math.max(0, Math.min(100, parseInt(e.target.value) || 100))
+            onMaxChange(val)
+          }}
+          onBlur={() => {
+            // On blur, ensure max > min
+            if (max <= min) onMaxChange(Math.min(100, min + 1))
           }}
           className={`w-14 bg-gray-800 border ${colors.border} rounded px-2 py-1 text-white text-center text-sm font-mono`}
         />
