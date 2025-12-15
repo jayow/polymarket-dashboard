@@ -99,22 +99,22 @@ export default function OrderBookCell({ tokenId, className = '' }: OrderBookCell
   const { bestBid, bestAsk, spread, spreadPercent } = orderBook
 
   return (
-    <div className={`text-xs space-y-1 ${className}`}>
+    <div className={`text-[10px] space-y-0.5 ${className}`}>
       {/* Bid/Ask with prices and USD amounts */}
-      <div className="flex items-center gap-2 justify-center">
+      <div className="flex items-center gap-1 justify-center">
         {/* Bid */}
         <div className="text-right">
           <span className="text-green-400 font-mono">
             {bestBid ? `${(bestBid.price * 100).toFixed(1)}¢` : '—'}
           </span>
           {bestBid && (
-            <span className="text-green-600 ml-1 text-[10px]">
+            <span className="text-green-600 ml-0.5 text-[9px]">
               {formatUSD(bestBid.usdValue)}
             </span>
           )}
         </div>
         
-        <span className="text-gray-600">/</span>
+        <span className="text-gray-600 text-[9px]">/</span>
         
         {/* Ask */}
         <div className="text-left">
@@ -122,7 +122,7 @@ export default function OrderBookCell({ tokenId, className = '' }: OrderBookCell
             {bestAsk ? `${(bestAsk.price * 100).toFixed(1)}¢` : '—'}
           </span>
           {bestAsk && (
-            <span className="text-red-600 ml-1 text-[10px]">
+            <span className="text-red-600 ml-0.5 text-[9px]">
               {formatUSD(bestAsk.usdValue)}
             </span>
           )}
@@ -132,8 +132,8 @@ export default function OrderBookCell({ tokenId, className = '' }: OrderBookCell
       {/* Spread */}
       {spread !== null && (
         <div className="text-center text-gray-400">
-          <span className="font-semibold">{(spread * 100).toFixed(1)}¢</span>
-          <span className="text-gray-500 ml-1">
+          <span className="font-semibold text-[10px]">{(spread * 100).toFixed(1)}¢</span>
+          <span className="text-gray-500 ml-0.5 text-[9px]">
             ({spreadPercent?.toFixed(1)}%)
           </span>
         </div>
