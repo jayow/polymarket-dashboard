@@ -21,13 +21,14 @@ export async function GET(request: Request) {
     }
 
     // Fetch both current and closed positions in parallel
+    // Use limit=1000 to get more closed positions (default is ~10)
     const [currentResponse, closedResponse] = await Promise.all([
       fetch(`${DATA_API_POSITIONS_ENDPOINT}?user=${walletAddress}`, {
         method: 'GET',
         headers: { 'Content-Type': 'application/json' },
         next: { revalidate: 60 },
       }),
-      fetch(`${DATA_API_CLOSED_POSITIONS_ENDPOINT}?user=${walletAddress}`, {
+      fetch(`${DATA_API_CLOSED_POSITIONS_ENDPOINT}?user=${walletAddress}&limit=1000`, {
         method: 'GET',
         headers: { 'Content-Type': 'application/json' },
         next: { revalidate: 60 },
