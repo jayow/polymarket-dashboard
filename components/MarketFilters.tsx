@@ -63,50 +63,148 @@ interface MarketFiltersProps {
   onApplyFilters: (filters: FilterValues) => void
 }
 
-// Simple Price Range Input Component (no slider, just two number inputs)
-function PriceRangeInput({ 
+// Dual Range Slider Component for price ranges
+function DualRangeSlider({ 
   label, 
   min, 
   max, 
   onMinChange, 
-  onMaxChange 
+  onMaxChange,
+  color = 'blue'
 }: { 
   label: string
   min: number
   max: number
   onMinChange: (value: number) => void
   onMaxChange: (value: number) => void
+  color?: 'blue' | 'green' | 'red'
 }) {
+  const minRef = React.useRef<HTMLInputElement>(null)
+  const maxRef = React.useRef<HTMLInputElement>(null)
+  
+  const colorClasses = {
+    blue: { bg: 'bg-blue-500', border: 'border-blue-500' },
+    green: { bg: 'bg-green-500', border: 'border-green-500' },
+    red: { bg: 'bg-red-500', border: 'border-red-500' }
+  }
+  
+  // Calculate thumb positions for visual feedback
+  const minThumbPos = min
+  const maxThumbPos = max
+  
   return (
     <div>
       <label className="block text-sm text-gray-400 mb-2">{label}</label>
-      <div className="flex items-center gap-2">
+      
+      {/* Value display with editable inputs */}
+      <div className="flex items-center gap-2 mb-3">
         <input
           type="number"
           min="0"
-          max="100"
+          max="99"
           value={min}
           onChange={(e) => {
-            const val = Math.max(0, Math.min(100, parseInt(e.target.value) || 0))
-            onMinChange(Math.min(val, max))
+            const val = Math.max(0, Math.min(99, parseInt(e.target.value) || 0))
+            if (val < max) onMinChange(val)
           }}
-          className="w-20 bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-white text-center"
-          placeholder="Min"
+          className={`w-16 bg-gray-800 border ${colorClasses[color].border} rounded px-2 py-1 text-white text-center text-sm font-mono`}
         />
-        <span className="text-gray-400">-</span>
+        <div className="flex-1 relative h-8 flex items-center">
+          {/* Track background */}
+          <div className="absolute w-full h-2 bg-gray-700 rounded-full" />
+          
+          {/* Active range highlight */}
+          <div 
+            className={`absolute h-2 ${colorClasses[color].bg} rounded-full opacity-60`}
+            style={{
+              left: `${minThumbPos}%`,
+              width: `${maxThumbPos - minThumbPos}%`
+            }}
+          />
+          
+          {/* Min Range Input - Lower z-index, pointer events enabled */}
+          <input
+            ref={minRef}
+            type="range"
+            min="0"
+            max="100"
+            value={min}
+            onChange={(e) => {
+              const newMin = parseInt(e.target.value)
+              if (newMin < max) {
+                onMinChange(newMin)
+              }
+            }}
+            className="absolute w-full h-2 appearance-none bg-transparent cursor-pointer"
+            style={{ 
+              zIndex: 10,
+              pointerEvents: 'auto'
+            }}
+          />
+          
+          {/* Max Range Input - Higher z-index for right side */}
+          <input
+            ref={maxRef}
+            type="range"
+            min="0"
+            max="100"
+            value={max}
+            onChange={(e) => {
+              const newMax = parseInt(e.target.value)
+              if (newMax > min) {
+                onMaxChange(newMax)
+              }
+            }}
+            className="absolute w-full h-2 appearance-none bg-transparent cursor-pointer"
+            style={{ 
+              zIndex: 20,
+              pointerEvents: 'auto'
+            }}
+          />
+        </div>
         <input
           type="number"
-          min="0"
+          min="1"
           max="100"
           value={max}
           onChange={(e) => {
-            const val = Math.max(0, Math.min(100, parseInt(e.target.value) || 100))
-            onMaxChange(Math.max(val, min))
+            const val = Math.max(1, Math.min(100, parseInt(e.target.value) || 100))
+            if (val > min) onMaxChange(val)
           }}
-          className="w-20 bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-white text-center"
-          placeholder="Max"
+          className={`w-16 bg-gray-800 border ${colorClasses[color].border} rounded px-2 py-1 text-white text-center text-sm font-mono`}
         />
-        <span className="text-gray-400 text-sm">%</span>
+      </div>
+      
+      {/* Quick select buttons */}
+      <div className="flex gap-1 flex-wrap">
+        <button
+          type="button"
+          onClick={() => { onMinChange(0); onMaxChange(100); }}
+          className={`px-2 py-0.5 text-xs rounded transition-colors ${min === 0 && max === 100 ? colorClasses[color].bg + ' text-white' : 'bg-gray-700 hover:bg-gray-600 text-gray-300'}`}
+        >
+          All
+        </button>
+        <button
+          type="button"
+          onClick={() => { onMinChange(0); onMaxChange(10); }}
+          className={`px-2 py-0.5 text-xs rounded transition-colors ${min === 0 && max === 10 ? colorClasses[color].bg + ' text-white' : 'bg-gray-700 hover:bg-gray-600 text-gray-300'}`}
+        >
+          0-10%
+        </button>
+        <button
+          type="button"
+          onClick={() => { onMinChange(90); onMaxChange(100); }}
+          className={`px-2 py-0.5 text-xs rounded transition-colors ${min === 90 && max === 100 ? colorClasses[color].bg + ' text-white' : 'bg-gray-700 hover:bg-gray-600 text-gray-300'}`}
+        >
+          90-100%
+        </button>
+        <button
+          type="button"
+          onClick={() => { onMinChange(40); onMaxChange(60); }}
+          className={`px-2 py-0.5 text-xs rounded transition-colors ${min === 40 && max === 60 ? colorClasses[color].bg + ' text-white' : 'bg-gray-700 hover:bg-gray-600 text-gray-300'}`}
+        >
+          40-60%
+        </button>
       </div>
     </div>
   )
@@ -381,21 +479,23 @@ export default function MarketFilters({
           </div>
 
           {/* YES Price Range */}
-          <PriceRangeInput
+          <DualRangeSlider
             label="YES Price Range (%)"
             min={tempFilters.minYesPrice || 0}
             max={tempFilters.maxYesPrice || 100}
             onMinChange={(min) => setTempFilters({ ...tempFilters, minYesPrice: min })}
             onMaxChange={(max) => setTempFilters({ ...tempFilters, maxYesPrice: max })}
+            color="green"
           />
 
           {/* NO Price Range */}
-          <PriceRangeInput
+          <DualRangeSlider
             label="NO Price Range (%)"
             min={tempFilters.minNoPrice || 0}
             max={tempFilters.maxNoPrice || 100}
             onMinChange={(min) => setTempFilters({ ...tempFilters, minNoPrice: min })}
             onMaxChange={(max) => setTempFilters({ ...tempFilters, maxNoPrice: max })}
+            color="red"
           />
 
           {/* Order Book Filters Section */}

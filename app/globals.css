@@ -89,66 +89,46 @@ input[type="range"]::-moz-range-thumb:hover {
   background: #2563eb;
 }
 
-/* Dual-handle range slider styles */
-.range-slider {
-  pointer-events: auto;
-}
-
-.range-slider::-webkit-slider-thumb {
+/* Custom range slider styling - clean white thumb with shadow */
+input[type="range"].cursor-pointer::-webkit-slider-thumb {
   -webkit-appearance: none;
   appearance: none;
   width: 20px;
   height: 20px;
   border-radius: 50%;
-  background: #3B82F6; /* Polymarket blue */
+  background: #ffffff;
   cursor: grab;
-  border: 2px solid #1F2937; /* Dark gray border */
-  box-shadow: 0 0 0 2px #3B82F6, 0 2px 4px rgba(0, 0, 0, 0.3); /* Blue glow + shadow */
-  transition: background 0.15s ease-in-out, box-shadow 0.15s ease-in-out, transform 0.1s ease-in-out;
-  position: relative;
+  border: 2px solid #6B7280;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+  margin-top: -6px;
 }
 
-.range-slider::-webkit-slider-thumb:active {
+input[type="range"].cursor-pointer::-webkit-slider-thumb:hover {
+  border-color: #3B82F6;
+  box-shadow: 0 2px 6px rgba(59, 130, 246, 0.4);
+}
+
+input[type="range"].cursor-pointer::-webkit-slider-thumb:active {
   cursor: grabbing;
-  background: #2563EB;
   transform: scale(1.1);
-  box-shadow: 0 0 0 3px #3B82F6, 0 3px 6px rgba(0, 0, 0, 0.4);
 }
 
-.range-slider::-moz-range-thumb {
+input[type="range"].cursor-pointer::-moz-range-thumb {
   width: 20px;
   height: 20px;
   border-radius: 50%;
-  background: #3B82F6; /* Polymarket blue */
+  background: #ffffff;
   cursor: grab;
-  border: 2px solid #1F2937; /* Dark gray border */
-  box-shadow: 0 0 0 2px #3B82F6, 0 2px 4px rgba(0, 0, 0, 0.3);
-  transition: background 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+  border: 2px solid #6B7280;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
 }
 
-.range-slider::-moz-range-thumb:active {
+input[type="range"].cursor-pointer::-moz-range-thumb:hover {
+  border-color: #3B82F6;
+  box-shadow: 0 2px 6px rgba(59, 130, 246, 0.4);
+}
+
+input[type="range"].cursor-pointer::-moz-range-thumb:active {
   cursor: grabbing;
-  background: #2563EB;
-  box-shadow: 0 0 0 3px #3B82F6, 0 3px 6px rgba(0, 0, 0, 0.4);
-}
-
-.range-slider::-webkit-slider-thumb:hover {
-  background: #2563EB; /* Darker blue on hover */
-  box-shadow: 0 0 0 3px #3B82F6, 0 2px 4px rgba(0, 0, 0, 0.3);
-}
-
-.range-slider::-moz-range-thumb:hover {
-  background: #2563EB; /* Darker blue on hover */
-  box-shadow: 0 0 0 3px #3B82F6, 0 2px 4px rgba(0, 0, 0, 0.3);
-}
-
-.range-slider::-webkit-slider-runnable-track {
-  background: transparent;
-  height: 8px;
-}
-
-.range-slider::-moz-range-track {
-  background: transparent;
-  height: 8px;
 }
 
