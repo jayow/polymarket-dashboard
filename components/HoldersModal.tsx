@@ -161,6 +161,7 @@ function HolderRow({ holder, rank, variant }: { holder: Holder; rank: number; va
   const displayName = holder.name || holder.pseudonym || shortenAddress(holder.proxyWallet)
   const showBadge = rank <= 3
   const variantColor = variant === 'yes' ? 'green' : 'red'
+  const profileUrl = buildProfileUrl(holder)
 
   return (
     <div className="flex items-center gap-3 p-3 bg-gray-800/50 rounded-lg hover:bg-gray-800 transition-colors">
@@ -197,7 +198,7 @@ function HolderRow({ holder, rank, variant }: { holder: Holder; rank: number; va
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2">
           <a
-            href={`https://polymarket.com/account/${holder.proxyWallet}`}
+            href={profileUrl}
             target="_blank"
             rel="noopener noreferrer"
             className="font-medium text-white truncate hover:text-polymarket-blue hover:underline transition-colors"
@@ -237,4 +238,15 @@ function formatShareAmount(amount: number): string {
     minimumFractionDigits: 0,
     maximumFractionDigits: 2 
   })
+}
+
+// Build a profile URL. Prefer handle-style URLs (polymarket.com/@username) when we
+// have a name or pseudonym. Otherwise fall back to the account (wallet) URL.
+function buildProfileUrl(holder: Holder): string {
+  const handle = holder.name || holder.pseudonym
+  if (handle) {
+    const sanitized = handle.startsWith('@') ? handle.slice(1) : handle
+    return `https://polymarket.com/@${sanitized}`
+  }
+  return `https://polymarket.com/account/${holder.proxyWallet}`
 }
