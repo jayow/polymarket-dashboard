@@ -52,6 +52,9 @@ export default function HoldersModal({ isOpen, onClose, marketId, marketQuestion
     const allHolders = [...data.yesHolders, ...data.noHolders]
     const uniqueWallets = Array.from(new Set(allHolders.map(h => h.proxyWallet)))
     
+    // Debug: Log sample wallet addresses
+    console.log('Sample wallet addresses for PNL lookup:', uniqueWallets.slice(0, 3))
+    
     // Fetch PNL in batches of 10 to avoid overwhelming the API
     const batchSize = 10
     const pnlResults = new Map<string, number | null>()
@@ -61,6 +64,10 @@ export default function HoldersModal({ isOpen, onClose, marketId, marketQuestion
       const promises = batch.map(async (wallet) => {
         try {
           const pnl = await fetchUserPnL(wallet)
+          // Debug: Log first few results
+          if (i === 0) {
+            console.log(`PNL for ${wallet}:`, pnl)
+          }
           return { wallet, pnl }
         } catch (err) {
           console.error(`Error fetching PNL for ${wallet}:`, err)

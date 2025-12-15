@@ -643,25 +643,35 @@ export async function fetchUserPnL(walletAddress: string): Promise<number | null
       console.log(`/value endpoint not available, using positions endpoint`)
     }
     
-    // Fallback: Sum realizedPnl from positions for true all-time PNL
+    // Fallback: Sum realizedPnl + cashPnl from positions for all-time PNL
     const positionsResponse = await fetch(`/api/positions?user=${walletAddress}`)
     
     if (!positionsResponse.ok) {
+      console.log(`Positions request failed for ${walletAddress}:`, positionsResponse.status)
       return null
     }
     
     const positions: Position[] = await positionsResponse.json()
     
     if (!Array.isArray(positions) || positions.length === 0) {
+      console.log(`No positions found for ${walletAddress}`)
       return null
     }
     
-    // Sum up realizedPnl from all positions for true all-time PNL
-    // realizedPnl represents actual profit/loss from closed/completed positions
+    // Debug: Log first position to see available fields
+    console.log(`Sample position for ${walletAddress}:`, positions[0])
+    
+    // Sum up BOTH realizedPnl AND cashPnl for total all-time PNL
+    // realizedPnl = profit/loss from closed positions
+    // cashPnl = unrealized profit/loss from open positions
+    // Total = realized + unrealized = all-time PNL
     const totalPnL = positions.reduce((sum, position) => {
-      const pnl = position.realizedPnl ?? 0
-      return sum + (typeof pnl === 'number' ? pnl : 0)
+      const realized = position.realizedPnl ?? 0
+      const unrealized = position.cashPnl ?? 0
+      return sum + (typeof realized === 'number' ? realized : 0) + (typeof unrealized === 'number' ? unrealized : 0)
     }, 0)
+    
+    console.log(`Total PNL for ${walletAddress}: ${totalPnL} (from ${positions.length} positions)`)
     
     return totalPnL
   } catch (error) {
