@@ -609,26 +609,57 @@ export interface Position {
   negativeRisk?: boolean;
 }
 
-// Fetch all-time PNL for a user (sum of all positions across all markets)
-// cashPnl includes both realized and unrealized PNL, representing total all-time performance
+// Value response interface
+export interface UserValue {
+  totalValue?: number;
+  totalPnL?: number;
+  realizedPnL?: number;
+  unrealizedPnL?: number;
+  [key: string]: any; // Allow other fields
+}
+
+// Fetch all-time PNL for a user
+// Uses /value endpoint first (if available), then falls back to summing realizedPnl from positions
+// realizedPnl represents true all-time profit/loss from closed positions
 export async function fetchUserPnL(walletAddress: string): Promise<number | null> {
   try {
-    const response = await fetch(`/api/positions?user=${walletAddress}`)
+    // First try the /value endpoint which may provide total realized PNL
+    try {
+      const valueResponse = await fetch(`/api/value?user=${walletAddress}`)
+      
+      if (valueResponse.ok) {
+        const valueData: UserValue = await valueResponse.json()
+        
+        // Prefer realizedPnL (true all-time), fallback to totalPnL
+        if (valueData.realizedPnL !== undefined && valueData.realizedPnL !== null) {
+          return valueData.realizedPnL
+        }
+        if (valueData.totalPnL !== undefined && valueData.totalPnL !== null) {
+          return valueData.totalPnL
+        }
+      }
+    } catch (valueError) {
+      // If /value endpoint doesn't exist or fails, continue to positions endpoint
+      console.log(`/value endpoint not available, using positions endpoint`)
+    }
     
-    if (!response.ok) {
+    // Fallback: Sum realizedPnl from positions for true all-time PNL
+    const positionsResponse = await fetch(`/api/positions?user=${walletAddress}`)
+    
+    if (!positionsResponse.ok) {
       return null
     }
     
-    const positions: Position[] = await response.json()
+    const positions: Position[] = await positionsResponse.json()
     
     if (!Array.isArray(positions) || positions.length === 0) {
       return null
     }
     
-    // Sum up cashPnl from all positions to get total all-time PNL
-    // cashPnl includes both realized (closed positions) and unrealized (open positions) PNL
+    // Sum up realizedPnl from all positions for true all-time PNL
+    // realizedPnl represents actual profit/loss from closed/completed positions
     const totalPnL = positions.reduce((sum, position) => {
-      const pnl = position.cashPnl ?? position.realizedPnl ?? 0
+      const pnl = position.realizedPnl ?? 0
       return sum + (typeof pnl === 'number' ? pnl : 0)
     }, 0)
     
