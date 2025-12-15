@@ -75,76 +75,75 @@ export default function MarketTable({ markets, onSort, sortField, sortOrder }: M
     <div className="overflow-x-auto">
       <table className="w-full border-collapse">
         <thead>
-          <tr className="bg-polymarket-gray border-b border-gray-700">
+          <tr className="bg-gradient-to-r from-slate-800/80 to-slate-900/80 border-b border-gray-700/50">
             <th 
-              className="text-left p-4 text-sm font-semibold text-gray-300 cursor-pointer hover:bg-gray-700 transition-colors"
+              className="text-left p-3 text-xs font-semibold text-gray-400 uppercase tracking-wider cursor-pointer hover:bg-white/5 transition-colors whitespace-nowrap"
               onClick={() => handleSort('question')}
             >
-              Question <SortIcon field="question" />
+              Market <SortIcon field="question" />
             </th>
             <th 
-              className="text-left p-4 text-sm font-semibold text-gray-300 cursor-pointer hover:bg-gray-700 transition-colors"
+              className="text-left p-3 text-xs font-semibold text-gray-400 uppercase tracking-wider cursor-pointer hover:bg-white/5 transition-colors whitespace-nowrap"
               onClick={() => handleSort('category')}
             >
-              Category <SortIcon field="category" />
+              Tag <SortIcon field="category" />
             </th>
             <th 
-              className="text-right p-4 text-sm font-semibold text-gray-300 cursor-pointer hover:bg-gray-700 transition-colors"
+              className="text-right p-3 text-xs font-semibold text-green-400/80 uppercase tracking-wider cursor-pointer hover:bg-white/5 transition-colors whitespace-nowrap"
               onClick={() => handleSort('yesPrice')}
             >
-              YES Price <SortIcon field="yesPrice" />
+              YES <SortIcon field="yesPrice" />
             </th>
             <th 
-              className="text-right p-4 text-sm font-semibold text-gray-300 cursor-pointer hover:bg-gray-700 transition-colors"
+              className="text-right p-3 text-xs font-semibold text-red-400/80 uppercase tracking-wider cursor-pointer hover:bg-white/5 transition-colors whitespace-nowrap"
               onClick={() => handleSort('noPrice')}
             >
-              NO Price <SortIcon field="noPrice" />
+              NO <SortIcon field="noPrice" />
             </th>
             <th 
-              className="text-right p-4 text-sm font-semibold text-gray-300 cursor-pointer hover:bg-gray-700 transition-colors"
+              className="text-right p-3 text-xs font-semibold text-gray-400 uppercase tracking-wider cursor-pointer hover:bg-white/5 transition-colors whitespace-nowrap"
               onClick={() => handleSort('volume')}
             >
-              Volume <SortIcon field="volume" />
+              Vol <SortIcon field="volume" />
             </th>
             <th 
-              className="text-right p-4 text-sm font-semibold text-gray-300 cursor-pointer hover:bg-gray-700 transition-colors"
+              className="text-right p-3 text-xs font-semibold text-gray-400 uppercase tracking-wider cursor-pointer hover:bg-white/5 transition-colors whitespace-nowrap"
               onClick={() => handleSort('liquidity')}
             >
-              Liquidity <SortIcon field="liquidity" />
+              Liq <SortIcon field="liquidity" />
             </th>
             <th 
-              className="text-right p-4 text-sm font-semibold text-gray-300 cursor-pointer hover:bg-gray-700 transition-colors"
+              className="text-right p-3 text-xs font-semibold text-gray-400 uppercase tracking-wider cursor-pointer hover:bg-white/5 transition-colors whitespace-nowrap"
               onClick={() => handleSort('volume24h')}
             >
-              24h Volume <SortIcon field="volume24h" />
+              24h <SortIcon field="volume24h" />
             </th>
             <th 
-              className="text-left p-4 text-sm font-semibold text-gray-300 cursor-pointer hover:bg-gray-700 transition-colors"
+              className="text-left p-3 text-xs font-semibold text-gray-400 uppercase tracking-wider cursor-pointer hover:bg-white/5 transition-colors whitespace-nowrap"
               onClick={() => handleSort('endDate')}
             >
-              Resolution Date <SortIcon field="endDate" />
+              Resolves <SortIcon field="endDate" />
             </th>
             <th 
-              className="text-right p-4 text-sm font-semibold text-gray-300 cursor-pointer hover:bg-gray-700 transition-colors"
+              className="text-right p-3 text-xs font-semibold text-gray-400 uppercase tracking-wider cursor-pointer hover:bg-white/5 transition-colors whitespace-nowrap"
               onClick={() => handleSort('daysUntil')}
             >
-              Time Until <SortIcon field="daysUntil" />
+              ETA <SortIcon field="daysUntil" />
             </th>
             <th 
-              className="text-center p-4 text-sm font-semibold text-gray-300 cursor-pointer hover:bg-gray-700 transition-colors"
+              className="text-center p-3 text-xs font-semibold text-gray-400 uppercase tracking-wider cursor-pointer hover:bg-white/5 transition-colors whitespace-nowrap"
               onClick={() => handleSort('status')}
             >
-              Status <SortIcon field="status" />
+              <SortIcon field="status" />
             </th>
-            <th className="text-center p-4 text-sm font-semibold text-gray-300">
-              Chart
+            <th className="text-center p-3 text-xs font-semibold text-gray-400 uppercase tracking-wider whitespace-nowrap">
+              📈
             </th>
-            <th className="text-center p-4 text-sm font-semibold text-gray-300 min-w-[140px]">
-              <div>Bid / Ask</div>
-              <div className="text-[10px] text-gray-500 font-normal">(Spread)</div>
+            <th className="text-center p-3 text-xs font-semibold text-gray-400 uppercase tracking-wider whitespace-nowrap min-w-[100px]">
+              Bid/Ask
             </th>
-            <th className="text-center p-4 text-sm font-semibold text-gray-300">
-              Holders
+            <th className="text-center p-3 text-xs font-semibold text-gray-400 uppercase tracking-wider whitespace-nowrap">
+              👥
             </th>
           </tr>
         </thead>
