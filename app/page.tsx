@@ -6,7 +6,6 @@ import MarketCard from '@/components/MarketCard'
 import MarketTable, { TableSortField, TableSortOrder } from '@/components/MarketTable'
 import MarketFilters, { SortField, SortOrder, FilterValues } from '@/components/MarketFilters'
 import { orderBookCache, ProcessedOrderBook } from '@/components/OrderBookCell'
-import Header from '@/components/Header'
 import StatsBar from '@/components/StatsBar'
 
 export default function Home() {
@@ -570,21 +569,29 @@ export default function Home() {
 
   return (
     <main className="min-h-screen">
-      <Header />
+      {/* Top Header Section - PolyFilter Title and Stats */}
+      <div className="w-full px-6 py-6 border-b border-gray-800">
+        <div className="flex items-center justify-between">
+          {/* Left: PolyFilter Title */}
+          <div>
+            <h1 className="text-4xl font-bold text-white">PolyFilter</h1>
+          </div>
+          
+          {/* Right: Stats */}
+          <StatsBar 
+            totalVolume={totalVolume}
+            totalLiquidity={totalLiquidity}
+            activeMarkets={activeMarkets}
+          />
+        </div>
+      </div>
       
-      <div className="container mx-auto px-4 py-8">
-        <StatsBar 
-          totalVolume={totalVolume}
-          totalLiquidity={totalLiquidity}
-          activeMarkets={activeMarkets}
-        />
-
-        <div className="mt-8">
-          {/* Header Section */}
+      <div className="container mx-auto px-6 py-6">
+        <div className="mt-6">
+          {/* Markets Header Section */}
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
             <div>
-              <h2 className="text-3xl font-bold">Markets</h2>
-              <p className="text-gray-400 mt-1">
+              <p className="text-gray-400">
                 {loading ? 'Loading markets...' : `Showing ${filteredAndSortedMarkets.length} of ${allMarkets.length} markets`}
               </p>
             </div>
