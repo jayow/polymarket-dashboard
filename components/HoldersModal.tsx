@@ -29,6 +29,14 @@ export default function HoldersModal({ isOpen, onClose, marketId, marketQuestion
       // Fetch maximum allowed holders (API max is 500)
       const data = await fetchMarketHolders(marketId, 500)
       setHoldersData(data)
+      
+      // Debug: Log sample holder data to check fields
+      if (data.yesHolders.length > 0) {
+        console.log('Sample YES holder data:', data.yesHolders[0])
+      }
+      if (data.noHolders.length > 0) {
+        console.log('Sample NO holder data:', data.noHolders[0])
+      }
     } catch (err: any) {
       setError(err.message || 'Failed to load holders')
     } finally {
@@ -148,7 +156,9 @@ export default function HoldersModal({ isOpen, onClose, marketId, marketQuestion
 }
 
 function HolderRow({ holder, rank, variant }: { holder: Holder; rank: number; variant: 'yes' | 'no' }) {
-  const displayName = holder.pseudonym || holder.name || shortenAddress(holder.proxyWallet)
+  // Polymarket UI prioritizes name (username) over pseudonym, then falls back to shortened address
+  // This matches how Polymarket displays holder names on their UI
+  const displayName = holder.name || holder.pseudonym || shortenAddress(holder.proxyWallet)
   const showBadge = rank <= 3
   const variantColor = variant === 'yes' ? 'green' : 'red'
 
