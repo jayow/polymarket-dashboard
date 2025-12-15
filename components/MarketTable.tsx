@@ -4,6 +4,8 @@ import { Market } from '@/lib/polymarket-api'
 import { formatCurrency, formatDate, formatDateTime, formatTimeUntil, getTimeUntilColor } from '@/lib/utils'
 import { useState, useEffect } from 'react'
 import HoldersModal from './HoldersModal'
+import Sparkline from './Sparkline'
+import OrderBookCell from './OrderBookCell'
 
 export type TableSortField = 'question' | 'category' | 'yesPrice' | 'noPrice' | 'volume' | 'liquidity' | 'volume24h' | 'endDate' | 'daysUntil' | 'status'
 export type TableSortOrder = 'asc' | 'desc'
@@ -135,6 +137,13 @@ export default function MarketTable({ markets, onSort, sortField, sortOrder }: M
               Status <SortIcon field="status" />
             </th>
             <th className="text-center p-4 text-sm font-semibold text-gray-300">
+              Chart
+            </th>
+            <th className="text-center p-4 text-sm font-semibold text-gray-300 min-w-[140px]">
+              <div>Bid / Ask</div>
+              <div className="text-[10px] text-gray-500 font-normal">(Spread)</div>
+            </th>
+            <th className="text-center p-4 text-sm font-semibold text-gray-300">
               Holders
             </th>
           </tr>
@@ -236,6 +245,19 @@ export default function MarketTable({ markets, onSort, sortField, sortOrder }: M
                   <span className={`px-2 py-1 rounded text-xs font-semibold ${statusColor}`}>
                     {statusText}
                   </span>
+                </td>
+                <td className="p-4 text-center">
+                  <Sparkline 
+                    tokenId={market.clobTokenIds?.[0]} 
+                    width={80} 
+                    height={24}
+                    className="mx-auto"
+                  />
+                </td>
+                <td className="p-4 text-center">
+                  <OrderBookCell 
+                    tokenId={market.clobTokenIds?.[0]}
+                  />
                 </td>
                 <td className="p-4 text-center">
                   <button

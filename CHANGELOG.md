@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Sparkline price charts** in table view showing historical YES price trends
+  - New `/api/price-history` API route to proxy CLOB price history endpoint
+  - New `Sparkline` component with SVG rendering and gradient fills
+  - In-memory cache for price history data (10-minute TTL)
+  - Color-coded charts: green for price increase, red for decrease
+  - Hover tooltip showing current price and change percentage
+  - Graceful handling for markets without price history
+- **Order book data** (Bid/Ask/Spread) in table view
+  - New `/api/orderbook` API route to proxy CLOB order book endpoint
+  - New `OrderBookCell` component showing:
+    - Best bid price with USD liquidity in green
+    - Best ask price with USD liquidity in red
+    - Spread in cents and percentage
+  - Color-coded spread: green (<2¢), yellow (2-5¢), red (>5¢)
+  - 30-second client-side cache for order book data
+  - Shared cache exported for filtering
+- **Order book filters** in filter panel
+  - Max Spread filter: ≤1¢, ≤2¢, ≤5¢, ≤10¢, ≤20¢
+  - Min Bid Liquidity filter: ≥$100, ≥$500, ≥$1K, ≥$5K, ≥$10K
+  - Min Ask Liquidity filter: ≥$100, ≥$500, ≥$1K, ≥$5K, ≥$10K
+  - Filters work on cached order book data (load markets first by scrolling)
+
 ### Changed
 - Refactored API fetching to use events as primary data structure (events contain markets)
 - Changed `fetchEvents()` to support fetching ALL events by passing `null`, `Infinity`, or `0` as limit
@@ -14,6 +37,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Improved pagination logic to continue fetching until API returns empty array
 - Added progress logging every 10 pages during fetch
 - Enhanced error messages with debug information
+- Parse `clobTokenIds` from JSON string format when transforming market data
 
 ### Fixed
 - Fixed type error: changed `category` return type from `null` to `undefined` to match interface

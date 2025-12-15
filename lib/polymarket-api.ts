@@ -559,8 +559,20 @@ function transformSingleMarket(market: any, event: any, eventTags?: string[]): M
     secondsUntilResolution: secondsUntil,
     // Condition ID for fetching holders (use market.conditionId or market.id)
     conditionId: market.conditionId || market.id?.toString() || '',
-    // CLOB token IDs for YES/NO outcomes
-    clobTokenIds: market.clobTokenIds || [],
+    // CLOB token IDs for YES/NO outcomes (parse from JSON string if needed)
+    clobTokenIds: (() => {
+      if (Array.isArray(market.clobTokenIds)) {
+        return market.clobTokenIds
+      }
+      if (typeof market.clobTokenIds === 'string') {
+        try {
+          return JSON.parse(market.clobTokenIds)
+        } catch {
+          return []
+        }
+      }
+      return []
+    })(),
   };
 }
 

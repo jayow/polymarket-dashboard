@@ -18,7 +18,13 @@ interface FilterValues {
   dateRange: { start: string; end: string }
   showClosed: boolean
   maxHoursUntil: number | null // null = no filter, number = max hours until resolution
+  // Order book filters
+  maxSpread: number | null // null = no filter, number = max spread in cents
+  minBidUSD: number | null // null = no filter, number = min bid liquidity in USD
+  minAskUSD: number | null // null = no filter, number = min ask liquidity in USD
 }
+
+export type { FilterValues }
 
 interface MarketFiltersProps {
   sortField: SortField
@@ -47,6 +53,13 @@ interface MarketFiltersProps {
   onNoPriceRangeChange: (min: number, max: number) => void
   maxHoursUntil: number | null
   onMaxHoursUntilChange: (hours: number | null) => void
+  // Order book filters
+  maxSpread: number | null
+  onMaxSpreadChange: (spread: number | null) => void
+  minBidUSD: number | null
+  onMinBidUSDChange: (amount: number | null) => void
+  minAskUSD: number | null
+  onMinAskUSDChange: (amount: number | null) => void
   onApplyFilters: (filters: FilterValues) => void
 }
 
@@ -126,6 +139,12 @@ export default function MarketFilters({
   onNoPriceRangeChange,
   maxHoursUntil,
   onMaxHoursUntilChange,
+  maxSpread,
+  onMaxSpreadChange,
+  minBidUSD,
+  onMinBidUSDChange,
+  minAskUSD,
+  onMinAskUSDChange,
   onApplyFilters,
 }: MarketFiltersProps) {
   const [showFilters, setShowFilters] = useState(false)
@@ -145,6 +164,9 @@ export default function MarketFilters({
     dateRange,
     showClosed,
     maxHoursUntil: maxHoursUntil || null,
+    maxSpread: maxSpread || null,
+    minBidUSD: minBidUSD || null,
+    minAskUSD: minAskUSD || null,
   })
 
   // Sync temp filters when props change (e.g., after reset)
@@ -162,8 +184,11 @@ export default function MarketFilters({
       dateRange,
       showClosed,
       maxHoursUntil: maxHoursUntil || null,
+      maxSpread: maxSpread || null,
+      minBidUSD: minBidUSD || null,
+      minAskUSD: minAskUSD || null,
     })
-  }, [selectedCategory, minVolume, maxVolume, minLiquidity, maxLiquidity, minYesPrice, maxYesPrice, minNoPrice, maxNoPrice, dateRange, showClosed, maxHoursUntil])
+  }, [selectedCategory, minVolume, maxVolume, minLiquidity, maxLiquidity, minYesPrice, maxYesPrice, minNoPrice, maxNoPrice, dateRange, showClosed, maxHoursUntil, maxSpread, minBidUSD, minAskUSD])
 
   return (
     <div className="bg-polymarket-gray rounded-lg border border-gray-700 mb-6 overflow-hidden">
@@ -373,6 +398,75 @@ export default function MarketFilters({
             onMaxChange={(max) => setTempFilters({ ...tempFilters, maxNoPrice: max })}
           />
 
+          {/* Order Book Filters Section */}
+          <div className="col-span-full border-t border-gray-700 pt-4 mt-2">
+            <h4 className="text-sm font-semibold text-gray-300 mb-3">📊 Order Book Filters</h4>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              {/* Max Spread */}
+              <div>
+                <label className="block text-sm text-gray-400 mb-2">Max Spread (¢)</label>
+                <select
+                  value={tempFilters.maxSpread === null ? '' : tempFilters.maxSpread.toString()}
+                  onChange={(e) => {
+                    const value = e.target.value === '' ? null : parseFloat(e.target.value)
+                    setTempFilters({ ...tempFilters, maxSpread: value })
+                  }}
+                  className="w-full bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-white"
+                >
+                  <option value="">No limit</option>
+                  <option value="1">≤ 1¢ (very tight)</option>
+                  <option value="2">≤ 2¢ (tight)</option>
+                  <option value="5">≤ 5¢ (moderate)</option>
+                  <option value="10">≤ 10¢</option>
+                  <option value="20">≤ 20¢</option>
+                </select>
+              </div>
+
+              {/* Min Bid USD */}
+              <div>
+                <label className="block text-sm text-gray-400 mb-2">Min Bid Liquidity ($)</label>
+                <select
+                  value={tempFilters.minBidUSD === null ? '' : tempFilters.minBidUSD.toString()}
+                  onChange={(e) => {
+                    const value = e.target.value === '' ? null : parseFloat(e.target.value)
+                    setTempFilters({ ...tempFilters, minBidUSD: value })
+                  }}
+                  className="w-full bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-white"
+                >
+                  <option value="">No minimum</option>
+                  <option value="100">≥ $100</option>
+                  <option value="500">≥ $500</option>
+                  <option value="1000">≥ $1,000</option>
+                  <option value="5000">≥ $5,000</option>
+                  <option value="10000">≥ $10,000</option>
+                </select>
+              </div>
+
+              {/* Min Ask USD */}
+              <div>
+                <label className="block text-sm text-gray-400 mb-2">Min Ask Liquidity ($)</label>
+                <select
+                  value={tempFilters.minAskUSD === null ? '' : tempFilters.minAskUSD.toString()}
+                  onChange={(e) => {
+                    const value = e.target.value === '' ? null : parseFloat(e.target.value)
+                    setTempFilters({ ...tempFilters, minAskUSD: value })
+                  }}
+                  className="w-full bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-white"
+                >
+                  <option value="">No minimum</option>
+                  <option value="100">≥ $100</option>
+                  <option value="500">≥ $500</option>
+                  <option value="1000">≥ $1,000</option>
+                  <option value="5000">≥ $5,000</option>
+                  <option value="10000">≥ $10,000</option>
+                </select>
+              </div>
+            </div>
+            <p className="text-xs text-gray-500 mt-2">
+              Note: Order book filters only apply to markets with active order books. Markets without order books will be hidden when these filters are active.
+            </p>
+          </div>
+
           </div>
           
           {/* Bottom Actions */}
@@ -399,6 +493,9 @@ export default function MarketFilters({
                   onDateRangeChange(tempFilters.dateRange.start, tempFilters.dateRange.end)
                   onShowClosedChange(tempFilters.showClosed)
                   onMaxHoursUntilChange(tempFilters.maxHoursUntil)
+                  onMaxSpreadChange(tempFilters.maxSpread)
+                  onMinBidUSDChange(tempFilters.minBidUSD)
+                  onMinAskUSDChange(tempFilters.minAskUSD)
                   // Trigger filter application
                   onApplyFilters(tempFilters)
                 }}
@@ -422,6 +519,9 @@ export default function MarketFilters({
                     dateRange: { start: '', end: '' },
                     showClosed: false,
                     maxHoursUntil: null,
+                    maxSpread: null,
+                    minBidUSD: null,
+                    minAskUSD: null,
                   }
                   setTempFilters(resetFilters)
                   setCategorySearchQuery('') // Clear category search
@@ -434,6 +534,9 @@ export default function MarketFilters({
                   onDateRangeChange('', '')
                   onShowClosedChange(false)
                   onMaxHoursUntilChange(null)
+                  onMaxSpreadChange(null)
+                  onMinBidUSDChange(null)
+                  onMinAskUSDChange(null)
                   onApplyFilters(resetFilters)
                 }}
                 className="px-6 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg transition-colors font-medium text-white"

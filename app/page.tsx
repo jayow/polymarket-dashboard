@@ -4,7 +4,8 @@ import { useEffect, useState, useMemo, useCallback, useTransition, startTransiti
 import { fetchMarkets, Market } from '@/lib/polymarket-api'
 import MarketCard from '@/components/MarketCard'
 import MarketTable, { TableSortField, TableSortOrder } from '@/components/MarketTable'
-import MarketFilters, { SortField, SortOrder } from '@/components/MarketFilters'
+import MarketFilters, { SortField, SortOrder, FilterValues } from '@/components/MarketFilters'
+import { orderBookCache, ProcessedOrderBook } from '@/components/OrderBookCell'
 import Header from '@/components/Header'
 import StatsBar from '@/components/StatsBar'
 
@@ -29,6 +30,9 @@ export default function Home() {
   const [minNoPrice, setMinNoPrice] = useState<number>(0)
   const [maxNoPrice, setMaxNoPrice] = useState<number>(100)
   const [maxHoursUntil, setMaxHoursUntil] = useState<number | null>(null)
+  const [maxSpread, setMaxSpread] = useState<number | null>(null)
+  const [minBidUSD, setMinBidUSD] = useState<number | null>(null)
+  const [minAskUSD, setMinAskUSD] = useState<number | null>(null)
   const [filterKey, setFilterKey] = useState(0)
   const [searchQuery, setSearchQuery] = useState('') // Search input value
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('') // Debounced search query for filtering
@@ -375,6 +379,56 @@ export default function Home() {
       filtered = filtered.filter(m => new Date(m.endDate) <= endDate)
     }
 
+    // Order book filters (spread, bid/ask liquidity)
+    // Note: These filters only work on markets that have cached order book data
+    const orderBookFilterActive = maxSpread !== null || minBidUSD !== null || minAskUSD !== null
+    
+    if (orderBookFilterActive) {
+      const beforeCount = filtered.length
+      
+      filtered = filtered.filter(m => {
+        const tokenId = m.clobTokenIds?.[0]
+        if (!tokenId) return false // No token ID means no order book possible
+        
+        // Check if we have cached order book data for this market
+        const cached = orderBookCache.get(tokenId)
+        if (!cached?.data) {
+          // No cached data - exclude from filtered results when order book filters are active
+          // This encourages users to scroll through results to load order book data
+          return false
+        }
+        
+        const orderBook = cached.data
+        
+        // Check spread filter
+        if (maxSpread !== null) {
+          if (orderBook.spread === null) return false
+          const spreadCents = orderBook.spread * 100
+          if (spreadCents > maxSpread) return false
+        }
+        
+        // Check min bid USD filter
+        if (minBidUSD !== null) {
+          if (!orderBook.bestBid) return false
+          if (orderBook.bestBid.usdValue < minBidUSD) return false
+        }
+        
+        // Check min ask USD filter
+        if (minAskUSD !== null) {
+          if (!orderBook.bestAsk) return false
+          if (orderBook.bestAsk.usdValue < minAskUSD) return false
+        }
+        
+        return true
+      })
+      
+      const filters = []
+      if (maxSpread !== null) filters.push(`spread ≤ ${maxSpread}¢`)
+      if (minBidUSD !== null) filters.push(`bid ≥ $${minBidUSD}`)
+      if (minAskUSD !== null) filters.push(`ask ≥ $${minAskUSD}`)
+      console.log(`Order book filter: ${beforeCount} → ${filtered.length} markets (${filters.join(', ')})`)
+    }
+
     // Determine which sort field to use based on view mode
     const currentSortField = viewMode === 'table' ? tableSortField : sortField
     const currentSortOrder = viewMode === 'table' ? tableSortOrder : sortOrder
@@ -498,7 +552,7 @@ export default function Home() {
     }
     
     return filtered
-  }, [allMarkets, sortField, sortOrder, tableSortField, tableSortOrder, dateRange, showClosed, selectedCategory, minVolume, maxVolume, minLiquidity, maxLiquidity, minYesPrice, maxYesPrice, minNoPrice, maxNoPrice, maxHoursUntil, viewMode, filterKey, debouncedSearchQuery])
+  }, [allMarkets, sortField, sortOrder, tableSortField, tableSortOrder, dateRange, showClosed, selectedCategory, minVolume, maxVolume, minLiquidity, maxLiquidity, minYesPrice, maxYesPrice, minNoPrice, maxNoPrice, maxHoursUntil, maxSpread, minBidUSD, minAskUSD, viewMode, filterKey, debouncedSearchQuery])
 
   const handleSortChange = (field: SortField, order: SortOrder) => {
     setSortField(field)
@@ -658,6 +712,12 @@ export default function Home() {
             }}
             maxHoursUntil={maxHoursUntil}
             onMaxHoursUntilChange={setMaxHoursUntil}
+            maxSpread={maxSpread}
+            onMaxSpreadChange={setMaxSpread}
+            minBidUSD={minBidUSD}
+            onMinBidUSDChange={setMinBidUSD}
+            minAskUSD={minAskUSD}
+            onMinAskUSDChange={setMinAskUSD}
             onApplyFilters={(filters) => {
               // Update all filter state variables first
               setSelectedCategory(filters.selectedCategory)
@@ -672,6 +732,9 @@ export default function Home() {
               setDateRange(filters.dateRange)
               setShowClosed(filters.showClosed)
               setMaxHoursUntil(filters.maxHoursUntil)
+              setMaxSpread(filters.maxSpread)
+              setMinBidUSD(filters.minBidUSD)
+              setMinAskUSD(filters.minAskUSD)
               // Force re-filter by updating filterKey (triggers useMemo recalculation)
               setFilterKey(prev => prev + 1)
               console.log('Filters applied - filtering cached data:', filters)
