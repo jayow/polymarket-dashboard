@@ -41,14 +41,19 @@ export default function ShareFiltersModal({ isOpen, onClose, filters, resultCoun
       const canvas = await html2canvas(screenshotRef.current, {
         backgroundColor: '#0a0a0a',
         scale: 2,
+        width: 600,
+        height: screenshotRef.current.scrollHeight,
+        useCORS: true,
+        logging: false,
       })
       
       const link = document.createElement('a')
       link.download = `polyfilter-results-${Date.now()}.png`
-      link.href = canvas.toDataURL('image/png')
+      link.href = canvas.toDataURL('image/png', 1.0)
       link.click()
     } catch (err) {
       console.error('Failed to export image:', err)
+      alert('Failed to export image. Please try again.')
     }
   }
 
@@ -129,26 +134,30 @@ export default function ShareFiltersModal({ isOpen, onClose, filters, resultCoun
             </div>
           )}
 
-          {/* Screenshot Preview (hidden, used for export) */}
-          <div ref={screenshotRef} className="hidden bg-polymarket-dark p-6 rounded-lg border border-gray-700">
-            <div className="text-center mb-4">
-              <h3 className="text-2xl font-bold text-white mb-2">PolyFilter Results</h3>
-              <p className="text-gray-400">{resultCount} markets found</p>
+          {/* Screenshot Preview (off-screen, used for export) */}
+          <div 
+            ref={screenshotRef} 
+            className="absolute -left-[9999px] bg-polymarket-dark p-8 rounded-lg border border-gray-700 w-[600px]"
+            style={{ top: 0 }}
+          >
+            <div className="text-center mb-6">
+              <h3 className="text-3xl font-bold text-white mb-3">PolyFilter Results</h3>
+              <p className="text-gray-400 text-lg">{resultCount} markets found</p>
             </div>
             {activeFilters.length > 0 && (
-              <div className="mb-4">
-                <p className="text-sm text-gray-400 mb-2">Filters Applied:</p>
-                <div className="space-y-1">
+              <div className="mb-6">
+                <p className="text-base text-gray-300 mb-3 font-semibold">Filters Applied:</p>
+                <div className="space-y-2">
                   {activeFilters.map((filter, idx) => (
-                    <div key={idx} className="text-sm text-white">
+                    <div key={idx} className="text-base text-white">
                       • {filter.label}: {filter.value}
                     </div>
                   ))}
                 </div>
               </div>
             )}
-            <div className="text-center mt-4">
-              <p className="text-xs text-gray-500">polyfilter.hanyon.app</p>
+            <div className="text-center mt-6 pt-6 border-t border-gray-700">
+              <p className="text-sm text-gray-500">polyfilter.hanyon.app</p>
             </div>
           </div>
 
