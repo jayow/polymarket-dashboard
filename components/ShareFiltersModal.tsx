@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { getShareableURL, formatFilterDisplay, ShareableFilters } from '@/lib/share-utils'
 import html2canvas from 'html2canvas'
-import QRCode from 'qrcode'
+import { QRCodeSVG } from 'qrcode.react'
 
 interface ShareFiltersModalProps {
   isOpen: boolean
@@ -15,18 +15,12 @@ interface ShareFiltersModalProps {
 export default function ShareFiltersModal({ isOpen, onClose, filters, resultCount }: ShareFiltersModalProps) {
   const [copied, setCopied] = useState(false)
   const [shareUrl, setShareUrl] = useState('')
-  const [qrCode, setQrCode] = useState<string>('')
   const screenshotRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     if (isOpen) {
       const url = getShareableURL(filters)
       setShareUrl(url)
-      
-      // Generate QR code
-      QRCode.toDataURL(url, { width: 200, margin: 1 })
-        .then(setQrCode)
-        .catch(console.error)
     }
   }, [isOpen, filters])
 
@@ -198,13 +192,13 @@ export default function ShareFiltersModal({ isOpen, onClose, filters, resultCoun
           </div>
 
           {/* QR Code */}
-          {qrCode && (
+          {shareUrl && (
             <div className="mb-6 text-center">
               <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3">
                 Scan to Open
               </h3>
               <div className="inline-block p-4 bg-white rounded-lg">
-                <img src={qrCode} alt="QR Code" className="w-32 h-32" />
+                <QRCodeSVG value={shareUrl} size={128} level="M" />
               </div>
             </div>
           )}
