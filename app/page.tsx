@@ -1,12 +1,14 @@
 'use client'
 
-import { useEffect, useState, useMemo, useCallback, useTransition, startTransition } from 'react'
+import { useEffect, useState, useMemo, useCallback, useTransition, startTransition, useRef } from 'react'
 import { fetchMarkets, Market } from '@/lib/polymarket-api'
 import MarketCard from '@/components/MarketCard'
 import MarketTable, { TableSortField, TableSortOrder } from '@/components/MarketTable'
 import MarketFilters, { SortField, SortOrder, FilterValues } from '@/components/MarketFilters'
 import { orderBookCache, ProcessedOrderBook } from '@/components/OrderBookCell'
 import StatsBar from '@/components/StatsBar'
+import ShareFiltersModal from '@/components/ShareFiltersModal'
+import { encodeFiltersToURL, decodeFiltersFromURL, ShareableFilters } from '@/lib/share-utils'
 
 export default function Home() {
   const [allMarkets, setAllMarkets] = useState<Market[]>([])
@@ -36,10 +38,51 @@ export default function Home() {
   const [searchQuery, setSearchQuery] = useState('') // Search input value
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('') // Debounced search query for filtering
   const [isPending, startTransition] = useTransition() // For non-blocking updates
+  const [showShareModal, setShowShareModal] = useState(false)
+  
+  // Track if we've initialized from URL to prevent loops
+  const initializedFromURL = useRef(false)
 
   useEffect(() => {
     loadMarkets()
   }, [])
+
+  // Read filters from URL on mount
+  useEffect(() => {
+    if (!initializedFromURL.current && typeof window !== 'undefined') {
+      const searchParams = new URLSearchParams(window.location.search)
+      if (searchParams.toString()) {
+        const urlFilters = decodeFiltersFromURL(searchParams)
+        
+        if (urlFilters.category) setSelectedCategory(urlFilters.category)
+        if (urlFilters.searchQuery) setSearchQuery(urlFilters.searchQuery)
+        if (urlFilters.dateStart || urlFilters.dateEnd) {
+          setDateRange({ 
+            start: urlFilters.dateStart || '', 
+            end: urlFilters.dateEnd || '' 
+          })
+        }
+        if (urlFilters.minVolume !== undefined) setMinVolume(urlFilters.minVolume)
+        if (urlFilters.maxVolume !== undefined) setMaxVolume(urlFilters.maxVolume)
+        if (urlFilters.minLiquidity !== undefined) setMinLiquidity(urlFilters.minLiquidity)
+        if (urlFilters.maxLiquidity !== undefined) setMaxLiquidity(urlFilters.maxLiquidity)
+        if (urlFilters.minYesPrice !== undefined) setMinYesPrice(urlFilters.minYesPrice)
+        if (urlFilters.maxYesPrice !== undefined) setMaxYesPrice(urlFilters.maxYesPrice)
+        if (urlFilters.minNoPrice !== undefined) setMinNoPrice(urlFilters.minNoPrice)
+        if (urlFilters.maxNoPrice !== undefined) setMaxNoPrice(urlFilters.maxNoPrice)
+        if (urlFilters.maxHoursUntil !== undefined) setMaxHoursUntil(urlFilters.maxHoursUntil)
+        if (urlFilters.maxSpread !== undefined) setMaxSpread(urlFilters.maxSpread)
+        if (urlFilters.minBidUSD !== undefined) setMinBidUSD(urlFilters.minBidUSD)
+        if (urlFilters.minAskUSD !== undefined) setMinAskUSD(urlFilters.minAskUSD)
+        if (urlFilters.showClosed !== undefined) setShowClosed(urlFilters.showClosed)
+        if (urlFilters.sortField) setSortField(urlFilters.sortField as SortField)
+        if (urlFilters.sortOrder) setSortOrder(urlFilters.sortOrder as SortOrder)
+        if (urlFilters.viewMode) setViewMode(urlFilters.viewMode)
+      }
+      
+      initializedFromURL.current = true
+    }
+  }, []) // Only run once on mount
 
   // Debounce search query for better performance
   useEffect(() => {
@@ -558,6 +601,52 @@ export default function Home() {
     setSortOrder(order)
   }
 
+  // Get current filters as ShareableFilters
+  const getCurrentFilters = useCallback((): ShareableFilters => ({
+    category: selectedCategory || undefined,
+    searchQuery: searchQuery || undefined,
+    dateStart: dateRange.start || undefined,
+    dateEnd: dateRange.end || undefined,
+    minVolume: minVolume > 0 ? minVolume : undefined,
+    maxVolume: maxVolume !== Infinity ? maxVolume : undefined,
+    minLiquidity: minLiquidity > 0 ? minLiquidity : undefined,
+    maxLiquidity: maxLiquidity !== Infinity ? maxLiquidity : undefined,
+    minYesPrice: minYesPrice > 0 ? minYesPrice : undefined,
+    maxYesPrice: maxYesPrice < 100 ? maxYesPrice : undefined,
+    minNoPrice: minNoPrice > 0 ? minNoPrice : undefined,
+    maxNoPrice: maxNoPrice < 100 ? maxNoPrice : undefined,
+    maxHoursUntil: maxHoursUntil !== null ? maxHoursUntil : undefined,
+    maxSpread: maxSpread !== null ? maxSpread : undefined,
+    minBidUSD: minBidUSD !== null ? minBidUSD : undefined,
+    minAskUSD: minAskUSD !== null ? minAskUSD : undefined,
+    showClosed: showClosed || undefined,
+    sortField: sortField || undefined,
+    sortOrder: sortOrder || undefined,
+    viewMode: viewMode || undefined,
+  }), [selectedCategory, searchQuery, dateRange, minVolume, maxVolume, minLiquidity, maxLiquidity, minYesPrice, maxYesPrice, minNoPrice, maxNoPrice, maxHoursUntil, maxSpread, minBidUSD, minAskUSD, showClosed, sortField, sortOrder, viewMode])
+
+  // Sync filters to URL (use replaceState to avoid navigation loops)
+  useEffect(() => {
+    // Skip on initial mount - let URL read effect handle initialization
+    if (!initializedFromURL.current) {
+      return
+    }
+    
+    const filters = getCurrentFilters()
+    const urlParams = encodeFiltersToURL(filters)
+    const currentParams = new URLSearchParams(window.location.search).toString()
+    
+    // Only update if URL actually changed
+    if (currentParams !== urlParams) {
+      const newUrl = urlParams ? `${window.location.pathname}?${urlParams}` : window.location.pathname
+      window.history.replaceState({}, '', newUrl)
+    }
+  }, [getCurrentFilters])
+
+  const handleShare = () => {
+    setShowShareModal(true)
+  }
+
   const handleTableSortChange = (field: TableSortField, order: TableSortOrder) => {
     setTableSortField(field)
     setTableSortOrder(order)
@@ -747,6 +836,7 @@ export default function Home() {
               setFilterKey(prev => prev + 1)
               console.log('Filters applied - filtering cached data:', filters)
             }}
+            onShare={handleShare}
           />
 
           {error && (
@@ -789,6 +879,14 @@ export default function Home() {
           )}
         </div>
       </div>
+
+      {/* Share Filters Modal */}
+      <ShareFiltersModal
+        isOpen={showShareModal}
+        onClose={() => setShowShareModal(false)}
+        filters={getCurrentFilters()}
+        resultCount={filteredAndSortedMarkets.length}
+      />
     </main>
   )
 }
