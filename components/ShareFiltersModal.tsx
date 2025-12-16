@@ -1,9 +1,7 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import { getShareableURL, formatFilterDisplay, ShareableFilters } from '@/lib/share-utils'
-import html2canvas from 'html2canvas'
-import { QRCodeSVG } from 'qrcode.react'
 
 interface ShareFiltersModalProps {
   isOpen: boolean
@@ -15,7 +13,6 @@ interface ShareFiltersModalProps {
 export default function ShareFiltersModal({ isOpen, onClose, filters, resultCount }: ShareFiltersModalProps) {
   const [copied, setCopied] = useState(false)
   const [shareUrl, setShareUrl] = useState('')
-  const screenshotRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     if (isOpen) {
@@ -31,29 +28,6 @@ export default function ShareFiltersModal({ isOpen, onClose, filters, resultCoun
       setTimeout(() => setCopied(false), 2000)
     } catch (err) {
       console.error('Failed to copy:', err)
-    }
-  }
-
-  const handleExportImage = async () => {
-    if (!screenshotRef.current) return
-
-    try {
-      const canvas = await html2canvas(screenshotRef.current, {
-        backgroundColor: '#0a0a0a',
-        scale: 2,
-        width: 600,
-        height: screenshotRef.current.scrollHeight,
-        useCORS: true,
-        logging: false,
-      })
-      
-      const link = document.createElement('a')
-      link.download = `polyfilter-results-${Date.now()}.png`
-      link.href = canvas.toDataURL('image/png', 1.0)
-      link.click()
-    } catch (err) {
-      console.error('Failed to export image:', err)
-      alert('Failed to export image. Please try again.')
     }
   }
 
@@ -134,33 +108,6 @@ export default function ShareFiltersModal({ isOpen, onClose, filters, resultCoun
             </div>
           )}
 
-          {/* Screenshot Preview (off-screen, used for export) */}
-          <div 
-            ref={screenshotRef} 
-            className="absolute -left-[9999px] bg-polymarket-dark p-8 rounded-lg border border-gray-700 w-[600px]"
-            style={{ top: 0 }}
-          >
-            <div className="text-center mb-6">
-              <h3 className="text-3xl font-bold text-white mb-3">PolyFilter Results</h3>
-              <p className="text-gray-400 text-lg">{resultCount} markets found</p>
-            </div>
-            {activeFilters.length > 0 && (
-              <div className="mb-6">
-                <p className="text-base text-gray-300 mb-3 font-semibold">Filters Applied:</p>
-                <div className="space-y-2">
-                  {activeFilters.map((filter, idx) => (
-                    <div key={idx} className="text-base text-white">
-                      • {filter.label}: {filter.value}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-            <div className="text-center mt-6 pt-6 border-t border-gray-700">
-              <p className="text-sm text-gray-500">polyfilter.hanyon.app</p>
-            </div>
-          </div>
-
           {/* Share URL */}
           <div className="mb-6">
             <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3">
@@ -200,20 +147,8 @@ export default function ShareFiltersModal({ isOpen, onClose, filters, resultCoun
             </div>
           </div>
 
-          {/* QR Code */}
-          {shareUrl && (
-            <div className="mb-6 text-center">
-              <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3">
-                Scan to Open
-              </h3>
-              <div className="inline-block p-4 bg-white rounded-lg">
-                <QRCodeSVG value={shareUrl} size={128} level="M" />
-              </div>
-            </div>
-          )}
-
           {/* Social Share Buttons */}
-          <div className="mb-6">
+          <div>
             <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3">
               Share on Social
             </h3>
@@ -246,19 +181,6 @@ export default function ShareFiltersModal({ isOpen, onClose, filters, resultCoun
                 Reddit
               </button>
             </div>
-          </div>
-
-          {/* Export as Image */}
-          <div>
-            <button
-              onClick={handleExportImage}
-              className="w-full flex items-center justify-center gap-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg px-4 py-3 font-medium transition-colors"
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-              </svg>
-              Export as Image
-            </button>
           </div>
         </div>
       </div>
