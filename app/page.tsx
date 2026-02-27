@@ -569,17 +569,11 @@ export default function Home() {
 
   return (
     <main className="min-h-screen">
-      {/* Top Header Section - PolyFilter Title and Stats */}
+      {/* Top Header Section - Stats */}
       <div className="container mx-auto px-6 py-6">
         <div className="flex items-center justify-between">
-          {/* Left: PolyFilter Title */}
-          <div>
-            <h1 className="text-4xl font-bold text-white">PolyFilter</h1>
-            <p className="text-sm font-medium text-gray-400 mt-1 italic">We filter the prediction noise</p>
-          </div>
-          
-          {/* Right: Stats */}
-          <StatsBar 
+          <p className="text-sm font-medium text-gray-400 italic">We filter the prediction noise</p>
+          <StatsBar
             totalVolume={totalVolume}
             totalLiquidity={totalLiquidity}
             activeMarkets={activeMarkets}

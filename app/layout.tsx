@@ -2,9 +2,10 @@ import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
 import { SpeedInsights } from '@vercel/speed-insights/next'
 import GoogleAnalytics from '@/components/GoogleAnalytics'
+import Navigation from '@/components/Navigation'
 import './globals.css'
 
-const inter = Inter({ 
+const inter = Inter({
   subsets: ['latin'],
   variable: '--font-inter',
   display: 'swap',
@@ -12,7 +13,7 @@ const inter = Inter({
 })
 
 export const metadata: Metadata = {
-  title: 'Polymarket Dashboard',
+  title: 'PolyFilter',
   description: 'Dashboard for viewing Polymarket prediction markets',
 }
 
@@ -24,6 +25,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`${inter.variable} font-sans antialiased`}>
+        <Navigation />
         {children}
         <SpeedInsights />
         <GoogleAnalytics measurementId={process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID} />
