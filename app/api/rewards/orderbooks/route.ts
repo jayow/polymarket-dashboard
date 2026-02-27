@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { fetchWithTimeout } from '@/lib/api-security'
 
 export const dynamic = 'force-dynamic'
 
@@ -58,9 +59,9 @@ function extractBest(levels: { price: string; size: string }[], side: 'bid' | 'a
 
 async function fetchSingleOrderbook(tokenId: string): Promise<{ bestBid: number | null; bestAsk: number | null; midPrice: number | null }> {
   try {
-    const res = await fetch(`${CLOB_ORDERBOOK_ENDPOINT}?token_id=${tokenId}`, {
+    const res = await fetchWithTimeout(`${CLOB_ORDERBOOK_ENDPOINT}?token_id=${tokenId}`, {
       headers: { 'Content-Type': 'application/json' },
-    })
+    }, 15000)
     if (!res.ok) return { bestBid: null, bestAsk: null, midPrice: null }
     const data = await res.json()
     if (data.error) return { bestBid: null, bestAsk: null, midPrice: null }
@@ -96,9 +97,9 @@ async function getMarketTokens(): Promise<MarketTokens[]> {
       ? `${CLOB_SAMPLING_ENDPOINT}?limit=1000&next_cursor=${cursor}`
       : `${CLOB_SAMPLING_ENDPOINT}?limit=1000`
 
-    const res = await fetch(url, {
+    const res = await fetchWithTimeout(url, {
       headers: { 'Content-Type': 'application/json' },
-    })
+    }, 30000)
     if (!res.ok) break
 
     const data = await res.json()
@@ -204,11 +205,11 @@ export async function GET() {
         'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=120',
       },
     })
-  } catch (error: any) {
+  } catch (error) {
     console.error('[orderbooks] Error:', error)
     return NextResponse.json(
-      { orderbooks: {}, cached: false, count: 0, error: error.message },
-      { status: 200 }
+      { orderbooks: {}, cached: false, count: 0 },
+      { status: 500 }
     )
   }
 }

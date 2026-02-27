@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { fetchWithTimeout } from '@/lib/api-security'
 
 export const dynamic = 'force-dynamic'
 
@@ -74,9 +75,9 @@ async function fetchAllSamplingMarkets(): Promise<ClobRewardMarket[]> {
       ? `${CLOB_SAMPLING_ENDPOINT}?limit=1000&next_cursor=${cursor}`
       : `${CLOB_SAMPLING_ENDPOINT}?limit=1000`
 
-    const res = await fetch(url, {
+    const res = await fetchWithTimeout(url, {
       headers: { 'Content-Type': 'application/json' },
-    })
+    }, 30000)
 
     if (!res.ok) break
 
@@ -100,9 +101,9 @@ async function fetchAllRewardsCurrent(): Promise<ClobRewardsCurrent[]> {
       ? `${CLOB_REWARDS_ENDPOINT}?limit=500&next_cursor=${cursor}`
       : `${CLOB_REWARDS_ENDPOINT}?limit=500`
 
-    const res = await fetch(url, {
+    const res = await fetchWithTimeout(url, {
       headers: { 'Content-Type': 'application/json' },
-    })
+    }, 30000)
 
     if (!res.ok) break
 
@@ -126,7 +127,7 @@ async function fetchGammaMarkets(): Promise<GammaMarket[]> {
     const pagePromises = Array.from({ length: BATCH_SIZE }, (_, i) => {
       const pageIndex = batch + i
       const url = `${GAMMA_MARKETS_ENDPOINT}?active=true&closed=false&limit=${PAGE_SIZE}&offset=${pageIndex * PAGE_SIZE}`
-      return fetch(url, { headers: { 'Content-Type': 'application/json' } })
+      return fetchWithTimeout(url, { headers: { 'Content-Type': 'application/json' } }, 30000)
         .then((res) => (res.ok ? res.json() : null))
         .then((data) => (Array.isArray(data) ? data : null))
         .catch(() => null)
@@ -155,8 +156,8 @@ export async function GET() {
       && globalForCache.rewardsCache.data?.stats?.gammaMarketsFetched > 0) {
       return NextResponse.json(globalForCache.rewardsCache.data, {
         headers: {
-          'Access-Control-Allow-Origin': '*',
           'Cache-Control': `public, s-maxage=${CACHE_DURATION}, stale-while-revalidate=${CACHE_DURATION * 2}`,
+          'X-Content-Type-Options': 'nosniff',
         },
       })
     }
@@ -268,14 +269,14 @@ export async function GET() {
 
     return NextResponse.json(responseData, {
       headers: {
-        'Access-Control-Allow-Origin': '*',
         'Cache-Control': `public, s-maxage=${CACHE_DURATION}, stale-while-revalidate=${CACHE_DURATION * 2}`,
+        'X-Content-Type-Options': 'nosniff',
       },
     })
-  } catch (error: any) {
+  } catch (error) {
     console.error('Error fetching rewards:', error)
     return NextResponse.json(
-      { error: error.message || 'Failed to fetch rewards data' },
+      { error: 'Service temporarily unavailable' },
       { status: 500 }
     )
   }

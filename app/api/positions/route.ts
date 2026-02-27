@@ -1,56 +1,46 @@
 import { NextResponse } from 'next/server'
+import { isValidWallet, buildUrl, secureHeaders, fetchWithTimeout } from '@/lib/api-security'
 
-// Mark route as dynamic
 export const dynamic = 'force-dynamic'
 
 const DATA_API_POSITIONS_ENDPOINT = 'https://data-api.polymarket.com/positions'
 
-// Polymarket Data API - Get User Positions (includes PNL)
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url)
-    const user = searchParams.get('user') // wallet address
+    const user = searchParams.get('user')
 
     if (!user) {
-      return NextResponse.json(
-        { error: 'user (wallet address) parameter is required' },
-        { status: 400 }
-      )
+      return NextResponse.json({ error: 'user parameter is required' }, { status: 400 })
     }
 
-    const url = `${DATA_API_POSITIONS_ENDPOINT}?user=${user}`
-    
-    const response = await fetch(url, {
+    if (!isValidWallet(user)) {
+      return NextResponse.json({ error: 'Invalid wallet address' }, { status: 400 })
+    }
+
+    const url = buildUrl(DATA_API_POSITIONS_ENDPOINT, { user })
+
+    const response = await fetchWithTimeout(url, {
       method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      // Cache for 1 minute (positions change frequently)
-      next: { revalidate: 60 },
+      headers: { 'Content-Type': 'application/json' },
+      next: { revalidate: 60 } as any,
     })
 
     if (!response.ok) {
-      // If user has no positions or doesn't exist, return empty array instead of error
       if (response.status === 404 || response.status === 400) {
         return NextResponse.json([])
       }
-      throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+      console.error(`[positions] Upstream HTTP ${response.status}`)
+      return NextResponse.json([])
     }
 
     const positions = await response.json()
-    
+
     return NextResponse.json(positions, {
-      headers: {
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Methods': 'GET',
-        'Access-Control-Allow-Headers': 'Content-Type',
-        'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=120',
-      },
+      headers: secureHeaders(60),
     })
-  } catch (error: any) {
+  } catch (error) {
     console.error('Error fetching positions:', error)
-    // Return empty array on error instead of failing
     return NextResponse.json([])
   }
 }
-

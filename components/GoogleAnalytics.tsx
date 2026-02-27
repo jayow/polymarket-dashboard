@@ -6,9 +6,10 @@ interface GoogleAnalyticsProps {
   measurementId?: string
 }
 
+const GA_ID_RE = /^G-[A-Z0-9]+$/
+
 export default function GoogleAnalytics({ measurementId }: GoogleAnalyticsProps) {
-  // Only render if measurement ID is provided
-  if (!measurementId) {
+  if (!measurementId || !GA_ID_RE.test(measurementId)) {
     return null
   }
 

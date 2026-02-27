@@ -1,58 +1,45 @@
 import { NextResponse } from 'next/server'
+import { isValidId, parseNumericParam, buildUrl, secureHeaders, safeErrorResponse, fetchWithTimeout } from '@/lib/api-security'
 
-// Mark route as dynamic
 export const dynamic = 'force-dynamic'
 
 const DATA_API_HOLDERS_ENDPOINT = 'https://data-api.polymarket.com/holders'
 
-// Polymarket Data API - Get Market Holders
-// Max limit: 500 holders per request
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url)
-    const market = searchParams.get('market') // conditionId
-    // Max allowed by Polymarket API is 500
-    const limit = Math.min(parseInt(searchParams.get('limit') || '500'), 500).toString()
-    const minBalance = searchParams.get('minBalance') || '1'
+    const market = searchParams.get('market')
+    const limit = parseNumericParam(searchParams.get('limit'), 500, 1, 500).toString()
+    const minBalance = parseNumericParam(searchParams.get('minBalance'), 1, 0, 1000000).toString()
 
     if (!market) {
-      return NextResponse.json(
-        { error: 'market (conditionId) parameter is required' },
-        { status: 400 }
-      )
+      return NextResponse.json({ error: 'market parameter is required' }, { status: 400 })
     }
 
-    const url = `${DATA_API_HOLDERS_ENDPOINT}?market=${market}&limit=${limit}&minBalance=${minBalance}`
-    
-    const response = await fetch(url, {
+    if (!isValidId(market)) {
+      return NextResponse.json({ error: 'Invalid market parameter' }, { status: 400 })
+    }
+
+    const url = buildUrl(DATA_API_HOLDERS_ENDPOINT, { market, limit, minBalance })
+
+    const response = await fetchWithTimeout(url, {
       method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      // Cache for 5 minutes
-      next: { revalidate: 300 },
+      headers: { 'Content-Type': 'application/json' },
+      next: { revalidate: 300 } as any,
     })
 
     if (!response.ok) {
-      throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+      console.error(`[holders] Upstream HTTP ${response.status}`)
+      return NextResponse.json(safeErrorResponse(), { status: 502 })
     }
 
     const holdersData = await response.json()
-    
+
     return NextResponse.json(holdersData, {
-      headers: {
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Methods': 'GET',
-        'Access-Control-Allow-Headers': 'Content-Type',
-        'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=600',
-      },
+      headers: secureHeaders(300),
     })
-  } catch (error: any) {
+  } catch (error) {
     console.error('Error fetching holders:', error)
-    return NextResponse.json(
-      { error: error.message || 'Failed to fetch holders' },
-      { status: 500 }
-    )
+    return NextResponse.json(safeErrorResponse(), { status: 500 })
   }
 }
-

@@ -1,57 +1,51 @@
 import { NextResponse } from 'next/server'
+import { isValidNumericId, parseNumericParam, buildUrl, secureHeaders, safeErrorResponse, fetchWithTimeout } from '@/lib/api-security'
 
-// Mark route as dynamic
 export const dynamic = 'force-dynamic'
 
 const CLOB_PRICES_HISTORY_ENDPOINT = 'https://clob.polymarket.com/prices-history'
 
-// Price history API for sparkline charts
-// Uses CLOB token ID (from market.clobTokenIds[0] for YES)
+const VALID_INTERVALS = new Set(['1d', '1w', '1m', 'max'])
+
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url)
-    const tokenId = searchParams.get('tokenId') // CLOB token ID
-    const interval = searchParams.get('interval') || 'max' // 1d, 1w, 1m, max
-    const fidelity = searchParams.get('fidelity') || '1440' // 1440 = daily data points
+    const tokenId = searchParams.get('tokenId')
+    const interval = searchParams.get('interval') || 'max'
+    const fidelity = parseNumericParam(searchParams.get('fidelity'), 1440, 1, 10080).toString()
 
     if (!tokenId) {
-      return NextResponse.json(
-        { error: 'tokenId parameter is required' },
-        { status: 400 }
-      )
+      return NextResponse.json({ error: 'tokenId parameter is required' }, { status: 400 })
     }
 
-    const url = `${CLOB_PRICES_HISTORY_ENDPOINT}?market=${tokenId}&interval=${interval}&fidelity=${fidelity}`
-    
-    const response = await fetch(url, {
+    if (!isValidNumericId(tokenId)) {
+      return NextResponse.json({ error: 'Invalid tokenId' }, { status: 400 })
+    }
+
+    if (!VALID_INTERVALS.has(interval)) {
+      return NextResponse.json({ error: 'Invalid interval' }, { status: 400 })
+    }
+
+    const url = buildUrl(CLOB_PRICES_HISTORY_ENDPOINT, { market: tokenId, interval, fidelity })
+
+    const response = await fetchWithTimeout(url, {
       method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      // Cache for 10 minutes
-      next: { revalidate: 600 },
+      headers: { 'Content-Type': 'application/json' },
+      next: { revalidate: 600 } as any,
     })
 
     if (!response.ok) {
-      throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+      console.error(`[price-history] Upstream HTTP ${response.status}`)
+      return NextResponse.json(safeErrorResponse(), { status: 502 })
     }
 
     const data = await response.json()
-    
+
     return NextResponse.json(data, {
-      headers: {
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Methods': 'GET',
-        'Access-Control-Allow-Headers': 'Content-Type',
-        'Cache-Control': 'public, s-maxage=600, stale-while-revalidate=1200',
-      },
+      headers: secureHeaders(600),
     })
-  } catch (error: any) {
+  } catch (error) {
     console.error('Error fetching price history:', error)
-    return NextResponse.json(
-      { error: error.message || 'Failed to fetch price history' },
-      { status: 500 }
-    )
+    return NextResponse.json(safeErrorResponse(), { status: 500 })
   }
 }
-
