@@ -126,7 +126,7 @@ export async function GET(request: Request) {
       timestamp: Date.now(),
     }, {
       headers: {
-        'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=120',
+        'Cache-Control': 'no-store',
         'X-Content-Type-Options': 'nosniff',
       },
     })

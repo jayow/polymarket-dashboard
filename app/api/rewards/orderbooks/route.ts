@@ -178,7 +178,7 @@ export async function GET() {
         timestamp: globalForOb.orderbookCache.timestamp,
       }, {
         headers: {
-          'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=120',
+          'Cache-Control': 'no-store',
         },
       })
     }
@@ -202,7 +202,7 @@ export async function GET() {
       timestamp: Date.now(),
     }, {
       headers: {
-        'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=120',
+        'Cache-Control': 'no-store',
       },
     })
   } catch (error) {

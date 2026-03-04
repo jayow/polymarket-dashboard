@@ -156,7 +156,7 @@ export async function GET() {
       && globalForCache.rewardsCache.data?.stats?.gammaMarketsFetched > 0) {
       return NextResponse.json(globalForCache.rewardsCache.data, {
         headers: {
-          'Cache-Control': `public, s-maxage=${CACHE_DURATION}, stale-while-revalidate=${CACHE_DURATION * 2}`,
+          'Cache-Control': 'no-store',
           'X-Content-Type-Options': 'nosniff',
         },
       })
@@ -269,7 +269,7 @@ export async function GET() {
 
     return NextResponse.json(responseData, {
       headers: {
-        'Cache-Control': `public, s-maxage=${CACHE_DURATION}, stale-while-revalidate=${CACHE_DURATION * 2}`,
+        'Cache-Control': 'no-store',
         'X-Content-Type-Options': 'nosniff',
       },
     })
