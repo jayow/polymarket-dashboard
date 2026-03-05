@@ -150,34 +150,37 @@ async function fetchGammaMarkets(): Promise<GammaMarket[]> {
   return allMarkets
 }
 
-// Fetch closed market condition IDs from Gamma (lightweight — just need the IDs)
-async function fetchClosedConditionIds(): Promise<Set<string>> {
+// Check if specific condition IDs are closed on Gamma (targeted lookups for markets missing from open set)
+async function checkClosedOnGamma(conditionIds: string[]): Promise<Set<string>> {
   const closedIds = new Set<string>()
-  const PAGE_SIZE = 500
-  const BATCH_SIZE = 10
+  if (conditionIds.length === 0) return closedIds
 
-  for (let batch = 0; ; batch += BATCH_SIZE) {
-    const pagePromises = Array.from({ length: BATCH_SIZE }, (_, i) => {
-      const pageIndex = batch + i
-      const url = `${GAMMA_MARKETS_ENDPOINT}?active=true&closed=true&limit=${PAGE_SIZE}&offset=${pageIndex * PAGE_SIZE}`
-      return fetchWithTimeout(url, { headers: { 'Content-Type': 'application/json' } }, 30000)
-        .then((res) => (res.ok ? res.json() : null))
-        .then((data) => (Array.isArray(data) ? data : null))
-        .catch(() => null)
-    })
+  const queue = [...conditionIds]
+  const CONCURRENCY = 30
 
-    const pages = await Promise.all(pagePromises)
-    let reachedEnd = false
-    for (const page of pages) {
-      if (page === null) continue
-      for (const m of page) {
-        if (m.conditionId) closedIds.add(m.conditionId)
+  const worker = async () => {
+    while (queue.length > 0) {
+      const cid = queue.shift()!
+      try {
+        const res = await fetchWithTimeout(
+          `${GAMMA_MARKETS_ENDPOINT}?conditionId=${cid}&limit=1`,
+          { headers: { 'Content-Type': 'application/json' } },
+          10000
+        )
+        if (!res.ok) continue
+        const data = await res.json()
+        if (Array.isArray(data) && data.length > 0) {
+          if (data[0].closed === true || data[0].acceptingOrders === false) {
+            closedIds.add(cid)
+          }
+        }
+      } catch {
+        // Skip on error — better to show than wrongly hide
       }
-      if (page.length < PAGE_SIZE) reachedEnd = true
     }
-    if (reachedEnd) break
   }
 
+  await Promise.all(Array.from({ length: CONCURRENCY }, () => worker()))
   return closedIds
 }
 
@@ -195,12 +198,11 @@ export async function GET() {
       })
     }
 
-    // Fetch CLOB sampling + CLOB rewards/current + Gamma (open + closed) in parallel
-    const [clobMarkets, rewardsCurrent, gammaMarkets, closedConditionIds] = await Promise.all([
+    // Fetch CLOB sampling + CLOB rewards/current + Gamma in parallel
+    const [clobMarkets, rewardsCurrent, gammaMarkets] = await Promise.all([
       fetchAllSamplingMarkets(),
       fetchAllRewardsCurrent(),
       fetchGammaMarkets(),
-      fetchClosedConditionIds(),
     ])
 
     // Build lookups
@@ -208,7 +210,14 @@ export async function GET() {
     for (const gm of gammaMarkets) {
       if (gm.conditionId) gammaLookup.set(gm.conditionId, gm)
     }
-    console.log(`[rewards] CLOB: ${clobMarkets.length}, Gamma: ${gammaMarkets.length}, Gamma lookup: ${gammaLookup.size}, Closed: ${closedConditionIds.size}`)
+
+    // Find CLOB markets not in Gamma's open set — these may be closed/resolved
+    const missingFromGamma = clobMarkets
+      .map((cm) => cm.condition_id)
+      .filter((cid) => !gammaLookup.has(cid))
+    const closedConditionIds = await checkClosedOnGamma(missingFromGamma)
+
+    console.log(`[rewards] CLOB: ${clobMarkets.length}, Gamma: ${gammaMarkets.length}, Gamma lookup: ${gammaLookup.size}, Missing: ${missingFromGamma.length}, Closed: ${closedConditionIds.size}`)
 
     const rewardsCurrentLookup = new Map<string, ClobRewardsCurrent>()
     for (const rc of rewardsCurrent) {
