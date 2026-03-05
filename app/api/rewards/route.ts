@@ -128,7 +128,7 @@ async function fetchGammaMarkets(): Promise<GammaMarket[]> {
   for (let batch = 0; ; batch += BATCH_SIZE) {
     const pagePromises = Array.from({ length: BATCH_SIZE }, (_, i) => {
       const pageIndex = batch + i
-      const url = `${GAMMA_MARKETS_ENDPOINT}?active=true&limit=${PAGE_SIZE}&offset=${pageIndex * PAGE_SIZE}`
+      const url = `${GAMMA_MARKETS_ENDPOINT}?active=true&closed=false&limit=${PAGE_SIZE}&offset=${pageIndex * PAGE_SIZE}`
       return fetchWithTimeout(url, { headers: { 'Content-Type': 'application/json' } }, 30000)
         .then((res) => (res.ok ? res.json() : null))
         .then((data) => (Array.isArray(data) ? data : null))
@@ -150,6 +150,37 @@ async function fetchGammaMarkets(): Promise<GammaMarket[]> {
   return allMarkets
 }
 
+// Fetch closed market condition IDs from Gamma (lightweight — just need the IDs)
+async function fetchClosedConditionIds(): Promise<Set<string>> {
+  const closedIds = new Set<string>()
+  const PAGE_SIZE = 500
+  const BATCH_SIZE = 10
+
+  for (let batch = 0; ; batch += BATCH_SIZE) {
+    const pagePromises = Array.from({ length: BATCH_SIZE }, (_, i) => {
+      const pageIndex = batch + i
+      const url = `${GAMMA_MARKETS_ENDPOINT}?active=true&closed=true&limit=${PAGE_SIZE}&offset=${pageIndex * PAGE_SIZE}`
+      return fetchWithTimeout(url, { headers: { 'Content-Type': 'application/json' } }, 30000)
+        .then((res) => (res.ok ? res.json() : null))
+        .then((data) => (Array.isArray(data) ? data : null))
+        .catch(() => null)
+    })
+
+    const pages = await Promise.all(pagePromises)
+    let reachedEnd = false
+    for (const page of pages) {
+      if (page === null) continue
+      for (const m of page) {
+        if (m.conditionId) closedIds.add(m.conditionId)
+      }
+      if (page.length < PAGE_SIZE) reachedEnd = true
+    }
+    if (reachedEnd) break
+  }
+
+  return closedIds
+}
+
 export async function GET() {
   try {
     // Return cached response if still fresh (and has gamma data)
@@ -164,11 +195,12 @@ export async function GET() {
       })
     }
 
-    // Fetch CLOB sampling + CLOB rewards/current + Gamma in parallel
-    const [clobMarkets, rewardsCurrent, gammaMarkets] = await Promise.all([
+    // Fetch CLOB sampling + CLOB rewards/current + Gamma (open + closed) in parallel
+    const [clobMarkets, rewardsCurrent, gammaMarkets, closedConditionIds] = await Promise.all([
       fetchAllSamplingMarkets(),
       fetchAllRewardsCurrent(),
       fetchGammaMarkets(),
+      fetchClosedConditionIds(),
     ])
 
     // Build lookups
@@ -176,7 +208,7 @@ export async function GET() {
     for (const gm of gammaMarkets) {
       if (gm.conditionId) gammaLookup.set(gm.conditionId, gm)
     }
-    console.log(`[rewards] CLOB: ${clobMarkets.length}, Gamma: ${gammaMarkets.length}, Gamma lookup keys: ${gammaLookup.size}`)
+    console.log(`[rewards] CLOB: ${clobMarkets.length}, Gamma: ${gammaMarkets.length}, Gamma lookup: ${gammaLookup.size}, Closed: ${closedConditionIds.size}`)
 
     const rewardsCurrentLookup = new Map<string, ClobRewardsCurrent>()
     for (const rc of rewardsCurrent) {
@@ -196,8 +228,7 @@ export async function GET() {
       // Filter if any token is marked as winner (resolved)
       if (cm.tokens?.some((t: { winner: boolean }) => t.winner)) return false
       // Filter if Gamma says market is closed (CLOB sampling can lag behind)
-      const gamma = gammaLookup.get(cm.condition_id)
-      if (gamma?.closed || gamma?.acceptingOrders === false) return false
+      if (closedConditionIds.has(cm.condition_id)) return false
       return true
     })
 
