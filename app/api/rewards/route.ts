@@ -181,11 +181,19 @@ export async function GET() {
       if (rc.condition_id) rewardsCurrentLookup.set(rc.condition_id, rc)
     }
 
-    // Filter out markets past their end date
+    // Filter out markets past their end date or already resolved
     const now = new Date().toISOString()
     const activeClobMarkets = clobMarkets.filter((cm) => {
-      if (!cm.end_date_iso) return true
-      return cm.end_date_iso > now
+      if (cm.end_date_iso && cm.end_date_iso <= now) return false
+      // Filter resolved markets: price at 0 or 1 means outcome is decided
+      const yesToken = cm.tokens?.find((t: { outcome: string; price: number }) => t.outcome === 'Yes')
+      const noToken = cm.tokens?.find((t: { outcome: string; price: number }) => t.outcome === 'No')
+      const yesPrice = yesToken?.price ?? 0.5
+      const noPrice = noToken?.price ?? 0.5
+      if (yesPrice <= 0.01 || yesPrice >= 0.99 || noPrice <= 0.01 || noPrice >= 0.99) return false
+      // Filter if any token is marked as winner (resolved)
+      if (cm.tokens?.some((t: { winner: boolean }) => t.winner)) return false
+      return true
     })
 
     // Merge CLOB reward data with rewards/current (sponsored) and Gamma metadata
