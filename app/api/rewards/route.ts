@@ -128,7 +128,7 @@ async function fetchGammaMarkets(): Promise<GammaMarket[]> {
   for (let batch = 0; ; batch += BATCH_SIZE) {
     const pagePromises = Array.from({ length: BATCH_SIZE }, (_, i) => {
       const pageIndex = batch + i
-      const url = `${GAMMA_MARKETS_ENDPOINT}?active=true&closed=false&limit=${PAGE_SIZE}&offset=${pageIndex * PAGE_SIZE}`
+      const url = `${GAMMA_MARKETS_ENDPOINT}?active=true&limit=${PAGE_SIZE}&offset=${pageIndex * PAGE_SIZE}`
       return fetchWithTimeout(url, { headers: { 'Content-Type': 'application/json' } }, 30000)
         .then((res) => (res.ok ? res.json() : null))
         .then((data) => (Array.isArray(data) ? data : null))
