@@ -47,6 +47,8 @@ interface GammaMarket {
   liquidity: string
   competitive: number
   holdingRewardsEnabled: boolean
+  closed: boolean
+  acceptingOrders: boolean
   rewardsMinSize: number
   rewardsMaxSpread: number
   clobRewards: {
@@ -193,6 +195,9 @@ export async function GET() {
       if (yesPrice <= 0.01 || yesPrice >= 0.99 || noPrice <= 0.01 || noPrice >= 0.99) return false
       // Filter if any token is marked as winner (resolved)
       if (cm.tokens?.some((t: { winner: boolean }) => t.winner)) return false
+      // Filter if Gamma says market is closed (CLOB sampling can lag behind)
+      const gamma = gammaLookup.get(cm.condition_id)
+      if (gamma?.closed || gamma?.acceptingOrders === false) return false
       return true
     })
 
@@ -217,8 +222,8 @@ export async function GET() {
         question: cm.question,
         slug: cm.market_slug,
         image: cm.image || cm.icon,
-        active: cm.active,
-        closed: cm.closed,
+        active: cm.active && !(gamma?.closed),
+        closed: cm.closed || gamma?.closed || false,
         endDate: cm.end_date_iso,
         dailyRate,
         sponsorRate,
