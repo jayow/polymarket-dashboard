@@ -192,11 +192,16 @@ export async function GET() {
     const rewardMarkets = activeClobMarkets.map((cm) => {
       const gamma = gammaLookup.get(cm.condition_id)
       const rc = rewardsCurrentLookup.get(cm.condition_id)
-      const dailyRate = rc?.native_daily_rate ?? cm.rewards?.rates?.[0]?.rewards_daily_rate ?? 0
 
-      // Use real sponsored data from CLOB rewards/current endpoint
+      // Native rate: use CLOB sampling (authoritative source of truth)
+      // rewards/current can be stale and return outdated rates
+      const dailyRate = cm.rewards?.rates?.reduce(
+        (sum: number, r: { rewards_daily_rate?: number }) => sum + (r.rewards_daily_rate ?? 0), 0
+      ) ?? 0
+
+      // Sponsored rate: only available from rewards/current
       const sponsorRate = rc?.sponsored_daily_rate ?? 0
-      const totalDailyRate = rc?.total_daily_rate ?? dailyRate
+      const totalDailyRate = dailyRate + sponsorRate
       const sponsorsCount = rc?.sponsors_count ?? 0
 
       return {
@@ -261,7 +266,9 @@ export async function GET() {
         totalSponsoredDaily,
         gammaMarketsFetched: gammaMarkets.length,
         gammaMatchCount,
+        rewardsCurrentFetched: rewardsCurrent.length,
       },
+      fetchedAt: Date.now(),
     }
 
     // Cache in memory (persists across hot reloads via globalThis)
