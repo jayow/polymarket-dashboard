@@ -62,6 +62,7 @@ interface FilterValues {
   maxVolume: number | null
   maxEndDate: string
   priceOperator: 'AND' | 'OR'
+  maxCurrentSpread: number | null
 }
 
 const DEFAULT_FILTERS: FilterValues = {
@@ -80,6 +81,7 @@ const DEFAULT_FILTERS: FilterValues = {
   maxVolume: null,
   maxEndDate: '',
   priceOperator: 'AND',
+  maxCurrentSpread: null,
 }
 
 const PRESETS_KEY = 'polyfilter-reward-presets'
@@ -121,6 +123,7 @@ export default function RewardsPage() {
   const [maxVolume, setMaxVolume] = useState<number | null>(null)
   const [maxEndDate, setMaxEndDate] = useState('')
   const [priceOperator, setPriceOperator] = useState<'AND' | 'OR'>('AND')
+  const [maxCurrentSpread, setMaxCurrentSpread] = useState<number | null>(null)
 
   // Presets
   const [presets, setPresets] = useState<FilterPreset[]>([])
@@ -133,6 +136,7 @@ export default function RewardsPage() {
     selectedTag, minYesPrice, maxYesPrice, minNoPrice, maxNoPrice,
     minCompetitive, maxCompetitive, minTotalRate, minDailyRate,
     minEfficiency, minSponsorRate, minMinSize, maxVolume, maxEndDate, priceOperator,
+    maxCurrentSpread,
   })
 
   const loadDraftFromValues = (f: FilterValues) => {
@@ -143,6 +147,7 @@ export default function RewardsPage() {
     setMinEfficiency(f.minEfficiency); setMinSponsorRate(f.minSponsorRate)
     setMinMinSize(f.minMinSize); setMaxVolume(f.maxVolume)
     setMaxEndDate(f.maxEndDate); setPriceOperator(f.priceOperator)
+    setMaxCurrentSpread(f.maxCurrentSpread ?? null)
   }
 
   const resetFilters = () => {
@@ -252,6 +257,14 @@ export default function RewardsPage() {
     if (minSponsorRate > 0 && m.sponsorRate < minSponsorRate) return false
     if (minMinSize > 0 && m.minSize < minMinSize) return false
     if (maxVolume !== null && m.volume > maxVolume) return false
+    if (maxCurrentSpread !== null) {
+      const ob = orderbookMap[m.conditionId]
+      if (ob?.yesBestBid != null && ob?.yesBestAsk != null) {
+        const spread = Math.round((ob.yesBestAsk! - ob.yesBestBid!) * 100)
+        if (spread > maxCurrentSpread) return false
+      }
+      // Markets without orderbook data pass through (no data to filter on)
+    }
     if (maxEndDate && m.endDate) {
       const marketEnd = new Date(m.endDate).getTime()
       const filterEnd = new Date(maxEndDate + 'T23:59:59Z').getTime()
@@ -278,7 +291,7 @@ export default function RewardsPage() {
     return data.holdingMarkets.filter((m) => !query || m.question.toLowerCase().includes(query))
   }, [data, searchQuery])
 
-  const hasActiveFilters = !!(selectedTag || minYesPrice > 0 || maxYesPrice < 100 || minNoPrice > 0 || maxNoPrice < 100 || minCompetitive > 0 || maxCompetitive < 100 || minTotalRate > 0 || minDailyRate > 0 || minEfficiency > 0 || minSponsorRate > 0 || minMinSize > 0 || maxVolume !== null || maxEndDate || searchQuery)
+  const hasActiveFilters = !!(selectedTag || minYesPrice > 0 || maxYesPrice < 100 || minNoPrice > 0 || maxNoPrice < 100 || minCompetitive > 0 || maxCompetitive < 100 || minTotalRate > 0 || minDailyRate > 0 || minEfficiency > 0 || minSponsorRate > 0 || minMinSize > 0 || maxVolume !== null || maxCurrentSpread !== null || maxEndDate || searchQuery)
 
   const tabs: { key: Tab; label: string; count: string }[] = [
     {
@@ -515,6 +528,32 @@ export default function RewardsPage() {
                 />
               </div>
 
+              <div>
+                <label className="block text-xs text-gray-400 uppercase tracking-wider mb-2">Max Live Spread</label>
+                <div className="flex items-center gap-2">
+                  <RangeSlider
+                    min={0}
+                    max={20}
+                    step={1}
+                    value={maxCurrentSpread ?? 20}
+                    onChange={(v) => setMaxCurrentSpread(v >= 20 ? null : v)}
+                    color="#f97316"
+                    invert
+                  />
+                  <div className="flex items-center shrink-0">
+                    <input
+                      type="number"
+                      min={0}
+                      max={20}
+                      value={maxCurrentSpread ?? ''}
+                      placeholder="Any"
+                      onChange={(e) => setMaxCurrentSpread(e.target.value ? Number(e.target.value) : null)}
+                      className={numInputClass}
+                    />
+                    <span className="text-gray-500 text-[11px] ml-0.5">¢</span>
+                  </div>
+                </div>
+              </div>
             </div>
 
             {/* AND/OR toggle for price filters */}
@@ -648,6 +687,11 @@ export default function RewardsPage() {
                 {maxVolume !== null && (
                   <span className="inline-flex items-center gap-1 px-2 py-1 bg-blue-500/20 text-blue-400 text-xs rounded-full">
                     Volume ≤ {formatCurrency(maxVolume)}
+                  </span>
+                )}
+                {maxCurrentSpread !== null && (
+                  <span className="inline-flex items-center gap-1 px-2 py-1 bg-orange-500/20 text-orange-400 text-xs rounded-full">
+                    Spread ≤ {maxCurrentSpread}¢
                   </span>
                 )}
                 {maxEndDate && (

@@ -39,7 +39,7 @@ export interface RewardMarket {
   holdingRewardsEnabled: boolean
 }
 
-export type RewardSortField = 'grade' | 'question' | 'dailyRate' | 'sponsorRate' | 'totalDailyRate' | 'maxSpread' | 'minSize' | 'yesPrice' | 'volume' | 'liquidity' | 'competitive' | 'rewardEfficiency' | 'endDate'
+export type RewardSortField = 'grade' | 'question' | 'dailyRate' | 'sponsorRate' | 'totalDailyRate' | 'maxSpread' | 'currentSpread' | 'minSize' | 'yesPrice' | 'volume' | 'liquidity' | 'competitive' | 'rewardEfficiency' | 'endDate'
 type SortOrder = 'asc' | 'desc'
 
 // --- MarketRow: receives pre-fetched orderbook data, supports manual refresh ---
@@ -142,6 +142,19 @@ function MarketRow({ market, score, orderbook }: {
       </td>
       {/* Max Spread */}
       <td className="p-2 text-gray-300">{market.maxSpread}¢</td>
+      {/* Current Spread */}
+      <td className="p-2">
+        {activeOb?.yesBestBid != null && activeOb?.yesBestAsk != null ? (() => {
+          const spread = Math.round((activeOb.yesBestAsk! - activeOb.yesBestBid!) * 100)
+          const tight = spread <= 1
+          const wide = spread > market.maxSpread
+          return (
+            <span className={`font-medium ${tight ? 'text-green-400' : wide ? 'text-red-400' : 'text-gray-300'}`}>
+              {spread}¢
+            </span>
+          )
+        })() : <span className="text-gray-600">—</span>}
+      </td>
       {/* Min Size */}
       <td className="p-2 text-gray-300">{market.minSize.toLocaleString()}</td>
       {/* Yes / No — live orderbook prices */}
@@ -329,6 +342,13 @@ export default function RewardsTable({ markets, orderbookMap: orderbookProp }: R
       case 'sponsorRate': return m.sponsorRate
       case 'totalDailyRate': return m.totalDailyRate
       case 'maxSpread': return m.maxSpread
+      case 'currentSpread': {
+        const ob = orderbookMap.get(m.conditionId)
+        if (ob?.yesBestBid != null && ob?.yesBestAsk != null) {
+          return Math.round((ob.yesBestAsk! - ob.yesBestBid!) * 100)
+        }
+        return -1 // no data sorts to bottom
+      }
       case 'minSize': return m.minSize
       case 'yesPrice': return m.yesPrice
       case 'volume': return m.volume
@@ -388,7 +408,7 @@ export default function RewardsTable({ markets, orderbookMap: orderbookProp }: R
           <span>Sorting by:</span>
           {sortColumns.map((s, i) => (
             <span key={s.field} className="inline-flex items-center gap-0.5 px-1.5 py-0.5 bg-polymarket-blue/10 text-polymarket-blue rounded">
-              {i + 1}. {s.field === 'grade' ? 'Grade' : s.field === 'rewardEfficiency' ? 'Efficiency' : s.field === 'totalDailyRate' ? 'Total Rate' : s.field === 'dailyRate' ? 'Native Rate' : s.field === 'sponsorRate' ? 'Sponsor Rate' : s.field === 'maxSpread' ? 'Max Spread' : s.field === 'minSize' ? 'Min Size' : s.field === 'yesPrice' ? 'Yes/No' : s.field === 'endDate' ? 'End Date' : s.field.charAt(0).toUpperCase() + s.field.slice(1)} {s.order === 'asc' ? '↑' : '↓'}
+              {i + 1}. {s.field === 'grade' ? 'Grade' : s.field === 'rewardEfficiency' ? 'Efficiency' : s.field === 'totalDailyRate' ? 'Total Rate' : s.field === 'dailyRate' ? 'Native Rate' : s.field === 'sponsorRate' ? 'Sponsor Rate' : s.field === 'maxSpread' ? 'Max Spread' : s.field === 'currentSpread' ? 'Spread' : s.field === 'minSize' ? 'Min Size' : s.field === 'yesPrice' ? 'Yes/No' : s.field === 'endDate' ? 'End Date' : s.field.charAt(0).toUpperCase() + s.field.slice(1)} {s.order === 'asc' ? '↑' : '↓'}
             </span>
           ))}
           <button
@@ -420,6 +440,9 @@ export default function RewardsTable({ markets, orderbookMap: orderbookProp }: R
             </th>
             <th className={thClass} onClick={(e) => handleSort('maxSpread', e)}>
               Max Spread <SortIcon field="maxSpread" />
+            </th>
+            <th className={thClass} onClick={(e) => handleSort('currentSpread', e)}>
+              Spread <SortIcon field="currentSpread" />
             </th>
             <th className={thClass} onClick={(e) => handleSort('minSize', e)}>
               Min Size <SortIcon field="minSize" />
