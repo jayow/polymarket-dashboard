@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useMemo } from 'react'
+import { useEffect, useState, useMemo, useCallback, useRef } from 'react'
 import RewardsStatsBar from '@/components/RewardsStatsBar'
 import RewardsTable, { RewardMarket } from '@/components/RewardsTable'
 import { formatCurrency } from '@/lib/utils'
@@ -102,7 +102,9 @@ export default function RewardsPage() {
   const [data, setData] = useState<RewardsData | null>(null)
   const [orderbookMap, setOrderbookMap] = useState<Record<string, OrderbookData>>({})
   const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
   const [activeTab, setActiveTab] = useState<Tab>('liquidity')
   const [searchQuery, setSearchQuery] = useState('')
   const [showFilters, setShowFilters] = useState(false)
@@ -175,30 +177,45 @@ export default function RewardsPage() {
     savePresetsToStorage(updated)
   }
 
-  useEffect(() => {
-    async function loadRewards() {
-      try {
-        setLoading(true)
-        const [rewardsRes, obRes] = await Promise.all([
-          fetch('/api/rewards'),
-          fetch('/api/rewards/orderbooks'),
-        ])
-        if (!rewardsRes.ok) throw new Error(`HTTP ${rewardsRes.status}`)
-        const rewardsJson = await rewardsRes.json()
-        setData(rewardsJson)
+  const REFRESH_INTERVAL = 3 * 60 * 1000 // 3 minutes
+  const fetchInProgress = useRef(false)
 
-        if (obRes.ok) {
-          const obJson = await obRes.json()
-          if (obJson.orderbooks) setOrderbookMap(obJson.orderbooks)
-        }
-      } catch (err: any) {
-        setError(err.message || 'Failed to load rewards')
-      } finally {
-        setLoading(false)
+  const fetchRewards = useCallback(async (isBackground = false) => {
+    if (fetchInProgress.current) return
+    fetchInProgress.current = true
+    try {
+      if (!isBackground) setLoading(true)
+      else setRefreshing(true)
+
+      const [rewardsRes, obRes] = await Promise.all([
+        fetch('/api/rewards'),
+        fetch('/api/rewards/orderbooks'),
+      ])
+      if (!rewardsRes.ok) throw new Error(`HTTP ${rewardsRes.status}`)
+      const rewardsJson = await rewardsRes.json()
+      setData(rewardsJson)
+      setLastUpdated(new Date())
+      setError(null)
+
+      if (obRes.ok) {
+        const obJson = await obRes.json()
+        if (obJson.orderbooks) setOrderbookMap(obJson.orderbooks)
       }
+    } catch (err: any) {
+      if (!isBackground) setError(err.message || 'Failed to load rewards')
+    } finally {
+      setLoading(false)
+      setRefreshing(false)
+      fetchInProgress.current = false
     }
-    loadRewards()
   }, [])
+
+  // Initial load + auto-refresh every 3 minutes
+  useEffect(() => {
+    fetchRewards(false)
+    const interval = setInterval(() => fetchRewards(true), REFRESH_INTERVAL)
+    return () => clearInterval(interval)
+  }, [fetchRewards])
 
   const allTags = useMemo(() => {
     if (!data) return []
@@ -313,7 +330,30 @@ export default function RewardsPage() {
         <div className="flex items-center justify-between flex-wrap gap-4">
           <div>
             <h1 className="text-3xl font-bold text-white">Rewards</h1>
-            <p className="text-sm text-gray-400 mt-1">Active reward markets, sponsorships, and holding rewards</p>
+            <div className="flex items-center gap-3 mt-1">
+              <p className="text-sm text-gray-400">Active reward markets, sponsorships, and holding rewards</p>
+              {lastUpdated && (
+                <div className="flex items-center gap-1.5 text-[11px] text-gray-500">
+                  <span>Updated {lastUpdated.toLocaleTimeString()}</span>
+                  {refreshing ? (
+                    <svg className="animate-spin h-3 w-3 text-polymarket-blue" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                    </svg>
+                  ) : (
+                    <button
+                      onClick={() => fetchRewards(true)}
+                      className="text-gray-500 hover:text-polymarket-blue transition-colors"
+                      title="Refresh now"
+                    >
+                      <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h5M20 20v-5h-5M4 9a8 8 0 0114.3-4.3M20 15a8 8 0 01-14.3 4.3" />
+                      </svg>
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
           {data && (
             <RewardsStatsBar
