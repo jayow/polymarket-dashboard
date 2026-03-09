@@ -71,14 +71,15 @@ const globalForCache = globalThis as unknown as {
 async function fetchAllSamplingMarkets(): Promise<ClobRewardMarket[]> {
   const allMarkets: ClobRewardMarket[] = []
   let cursor: string | undefined
+  const cacheBust = Date.now()
 
   while (true) {
     const url = cursor
-      ? `${CLOB_SAMPLING_ENDPOINT}?limit=1000&next_cursor=${cursor}`
-      : `${CLOB_SAMPLING_ENDPOINT}?limit=1000`
+      ? `${CLOB_SAMPLING_ENDPOINT}?limit=1000&next_cursor=${cursor}&_=${cacheBust}`
+      : `${CLOB_SAMPLING_ENDPOINT}?limit=1000&_=${cacheBust}`
 
     const res = await fetchWithTimeout(url, {
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-cache' },
     }, 30000)
 
     if (!res.ok) break
@@ -97,14 +98,15 @@ async function fetchAllSamplingMarkets(): Promise<ClobRewardMarket[]> {
 async function fetchAllRewardsCurrent(): Promise<ClobRewardsCurrent[]> {
   const allMarkets: ClobRewardsCurrent[] = []
   let cursor: string | undefined
+  const cacheBust = Date.now()
 
   while (true) {
     const url = cursor
-      ? `${CLOB_REWARDS_ENDPOINT}?limit=500&next_cursor=${cursor}`
-      : `${CLOB_REWARDS_ENDPOINT}?limit=500`
+      ? `${CLOB_REWARDS_ENDPOINT}?limit=500&next_cursor=${cursor}&_=${cacheBust}`
+      : `${CLOB_REWARDS_ENDPOINT}?limit=500&_=${cacheBust}`
 
     const res = await fetchWithTimeout(url, {
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-cache' },
     }, 30000)
 
     if (!res.ok) break
@@ -253,8 +255,15 @@ export async function GET() {
       ) ?? 0
 
       // Sponsored rate: only available from rewards/current
-      const sponsorRate = rc?.sponsored_daily_rate ?? 0
-      const totalDailyRate = dailyRate + sponsorRate
+      // Use rc.total_daily_rate as a sanity cap — if our computed total exceeds
+      // Polymarket's own total_daily_rate, use theirs (guards against stale CDN data)
+      let sponsorRate = rc?.sponsored_daily_rate ?? 0
+      let totalDailyRate = dailyRate + sponsorRate
+      if (rc?.total_daily_rate != null && rc.total_daily_rate < totalDailyRate) {
+        // rewards/current's own total is lower — trust it over the components
+        totalDailyRate = rc.total_daily_rate
+        sponsorRate = Math.max(0, totalDailyRate - dailyRate)
+      }
       const sponsorsCount = rc?.sponsors_count ?? 0
 
       return {
