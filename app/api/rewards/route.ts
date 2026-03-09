@@ -207,19 +207,58 @@ export async function GET() {
       fetchGammaMarkets(),
     ])
 
-    // Build lookups
+    // Build lookups — conditionId primary, slug fallback (for neg_risk markets)
     const gammaLookup = new Map<string, GammaMarket>()
+    const gammaSlugLookup = new Map<string, GammaMarket>()
     for (const gm of gammaMarkets) {
       if (gm.conditionId) gammaLookup.set(gm.conditionId, gm)
+      if (gm.slug) gammaSlugLookup.set(gm.slug, gm)
     }
 
-    // Find CLOB markets not in Gamma's open set — these may be closed/resolved
-    const missingFromGamma = clobMarkets
+    // For CLOB markets not matched by conditionId, try slug-based Gamma lookup
+    // Then do targeted Gamma fetches for neg_risk markets still missing
+    const missingMarkets = clobMarkets.filter((cm) => {
+      if (gammaLookup.has(cm.condition_id)) return false
+      // Try slug fallback
+      const bySlug = gammaSlugLookup.get(cm.market_slug)
+      if (bySlug) {
+        gammaLookup.set(cm.condition_id, bySlug)
+        return false
+      }
+      return true
+    })
+
+    // Targeted Gamma slug lookups for remaining missing markets (30 concurrent)
+    if (missingMarkets.length > 0) {
+      const queue = [...missingMarkets]
+      const CONCURRENCY = 30
+      const worker = async () => {
+        while (queue.length > 0) {
+          const cm = queue.shift()!
+          try {
+            const res = await fetchWithTimeout(
+              `${GAMMA_MARKETS_ENDPOINT}?slug=${cm.market_slug}&limit=1`,
+              { headers: { 'Content-Type': 'application/json' } },
+              10000
+            )
+            if (!res.ok) continue
+            const data = await res.json()
+            if (Array.isArray(data) && data.length > 0) {
+              gammaLookup.set(cm.condition_id, data[0] as GammaMarket)
+            }
+          } catch { /* skip */ }
+        }
+      }
+      await Promise.all(Array.from({ length: CONCURRENCY }, () => worker()))
+    }
+
+    // Find CLOB markets still not in Gamma — these may be closed/resolved
+    const stillMissing = clobMarkets
       .map((cm) => cm.condition_id)
       .filter((cid) => !gammaLookup.has(cid))
-    const closedConditionIds = await checkClosedOnGamma(missingFromGamma)
+    const closedConditionIds = await checkClosedOnGamma(stillMissing)
 
-    console.log(`[rewards] CLOB: ${clobMarkets.length}, Gamma: ${gammaMarkets.length}, Gamma lookup: ${gammaLookup.size}, Missing: ${missingFromGamma.length}, Closed: ${closedConditionIds.size}`)
+    console.log(`[rewards] CLOB: ${clobMarkets.length}, Gamma: ${gammaMarkets.length}, Gamma lookup: ${gammaLookup.size}, Slug-filled: ${missingMarkets.length - stillMissing.length}, Still missing: ${stillMissing.length}, Closed: ${closedConditionIds.size}`)
 
     const rewardsCurrentLookup = new Map<string, ClobRewardsCurrent>()
     for (const rc of rewardsCurrent) {
