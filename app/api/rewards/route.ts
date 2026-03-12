@@ -6,6 +6,7 @@ export const dynamic = 'force-dynamic'
 const CLOB_SAMPLING_ENDPOINT = 'https://clob.polymarket.com/sampling-markets'
 const CLOB_REWARDS_ENDPOINT = 'https://clob.polymarket.com/rewards/markets/current'
 const GAMMA_MARKETS_ENDPOINT = 'https://gamma-api.polymarket.com/markets'
+const LIVE_VOLUME_ENDPOINT = 'https://data-api.polymarket.com/live-volume'
 
 const CACHE_DURATION = 120
 
@@ -51,6 +52,7 @@ interface GammaMarket {
   acceptingOrders: boolean
   rewardsMinSize: number
   rewardsMaxSpread: number
+  events?: { id: string; slug: string }[]
   clobRewards: {
     id: string
     conditionId: string
@@ -150,6 +152,54 @@ async function fetchGammaMarkets(): Promise<GammaMarket[]> {
   }
 
   return allMarkets
+}
+
+// Fetch live volume from data-api for markets where Gamma has no volume
+// Groups by event ID and batch-fetches, returns conditionId → volume map
+async function fetchLiveVolumes(gammaLookup: Map<string, GammaMarket>): Promise<Map<string, number>> {
+  const volumeMap = new Map<string, number>()
+
+  // Collect unique event IDs for markets with missing volume
+  const eventIds = new Set<string>()
+  for (const [conditionId, gm] of gammaLookup) {
+    const hasVolume = gm.volume && parseFloat(gm.volume) > 0
+    if (!hasVolume && gm.events?.[0]?.id) {
+      eventIds.add(gm.events[0].id)
+    }
+  }
+
+  if (eventIds.size === 0) return volumeMap
+
+  // Batch-fetch live-volume for each unique event (20 concurrent)
+  const eventIdList = [...eventIds]
+  const CONCURRENCY = 20
+  const queue = [...eventIdList]
+
+  const worker = async () => {
+    while (queue.length > 0) {
+      const eventId = queue.shift()!
+      try {
+        const res = await fetchWithTimeout(
+          `${LIVE_VOLUME_ENDPOINT}?id=${eventId}`,
+          { headers: { 'Content-Type': 'application/json' } },
+          10000
+        )
+        if (!res.ok) continue
+        const data = await res.json()
+        if (Array.isArray(data) && data[0]?.markets) {
+          for (const m of data[0].markets) {
+            if (m.market && m.value != null) {
+              volumeMap.set(m.market, m.value)
+            }
+          }
+        }
+      } catch { /* skip */ }
+    }
+  }
+
+  await Promise.all(Array.from({ length: Math.min(CONCURRENCY, eventIdList.length) }, () => worker()))
+  console.log(`[rewards] Live volume: fetched ${eventIds.size} events, got volume for ${volumeMap.size} markets`)
+  return volumeMap
 }
 
 // Check if specific condition IDs are closed on Gamma (targeted lookups for markets missing from open set)
@@ -260,6 +310,9 @@ export async function GET() {
 
     console.log(`[rewards] CLOB: ${clobMarkets.length}, Gamma: ${gammaMarkets.length}, Gamma lookup: ${gammaLookup.size}, Slug-filled: ${missingMarkets.length - stillMissing.length}, Still missing: ${stillMissing.length}, Closed: ${closedConditionIds.size}`)
 
+    // Fetch live volume for markets where Gamma has no volume data (common for neg_risk sub-markets)
+    const liveVolumeMap = await fetchLiveVolumes(gammaLookup)
+
     const rewardsCurrentLookup = new Map<string, ClobRewardsCurrent>()
     for (const rc of rewardsCurrent) {
       if (rc.condition_id) rewardsCurrentLookup.set(rc.condition_id, rc)
@@ -324,7 +377,7 @@ export async function GET() {
         yesTokenId: cm.tokens?.find((t) => t.outcome === 'Yes')?.token_id ?? '',
         noTokenId: cm.tokens?.find((t) => t.outcome === 'No')?.token_id ?? '',
         tags: cm.tags || [],
-        volume: gamma?.volume ? parseFloat(gamma.volume) : 0,
+        volume: gamma?.volume ? parseFloat(gamma.volume) : (liveVolumeMap.get(cm.condition_id) ?? 0),
         liquidity: gamma?.liquidity ? parseFloat(gamma.liquidity) : 0,
         competitive: gamma?.competitive ?? 0,
         holdingRewardsEnabled: gamma?.holdingRewardsEnabled ?? false,

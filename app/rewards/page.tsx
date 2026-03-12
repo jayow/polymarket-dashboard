@@ -58,7 +58,7 @@ interface FilterValues {
   minDailyRate: number
   minEfficiency: number
   minSponsorRate: number
-  minMinSize: number
+  maxOrderSize: number | null
   maxVolume: number | null
   maxEndDate: string
   priceOperator: 'AND' | 'OR'
@@ -77,7 +77,7 @@ const DEFAULT_FILTERS: FilterValues = {
   minDailyRate: 0,
   minEfficiency: 0,
   minSponsorRate: 0,
-  minMinSize: 0,
+  maxOrderSize: null,
   maxVolume: null,
   maxEndDate: '',
   priceOperator: 'AND',
@@ -121,7 +121,7 @@ export default function RewardsPage() {
   const [minDailyRate, setMinDailyRate] = useState(0)
   const [minEfficiency, setMinEfficiency] = useState(0)
   const [minSponsorRate, setMinSponsorRate] = useState(0)
-  const [minMinSize, setMinMinSize] = useState(0)
+  const [maxOrderSize, setMaxOrderSize] = useState<number | null>(null)
   const [maxVolume, setMaxVolume] = useState<number | null>(null)
   const [maxEndDate, setMaxEndDate] = useState('')
   const [priceOperator, setPriceOperator] = useState<'AND' | 'OR'>('AND')
@@ -137,7 +137,7 @@ export default function RewardsPage() {
   const draftSnapshot = (): FilterValues => ({
     selectedTag, minYesPrice, maxYesPrice, minNoPrice, maxNoPrice,
     minCompetitive, maxCompetitive, minTotalRate, minDailyRate,
-    minEfficiency, minSponsorRate, minMinSize, maxVolume, maxEndDate, priceOperator,
+    minEfficiency, minSponsorRate, maxOrderSize, maxVolume, maxEndDate, priceOperator,
     maxCurrentSpread,
   })
 
@@ -147,7 +147,7 @@ export default function RewardsPage() {
     setMinCompetitive(f.minCompetitive); setMaxCompetitive(f.maxCompetitive)
     setMinTotalRate(f.minTotalRate); setMinDailyRate(f.minDailyRate)
     setMinEfficiency(f.minEfficiency); setMinSponsorRate(f.minSponsorRate)
-    setMinMinSize(f.minMinSize); setMaxVolume(f.maxVolume)
+    setMaxOrderSize(f.maxOrderSize ?? null); setMaxVolume(f.maxVolume)
     setMaxEndDate(f.maxEndDate); setPriceOperator(f.priceOperator)
     setMaxCurrentSpread(f.maxCurrentSpread ?? null)
   }
@@ -272,7 +272,7 @@ export default function RewardsPage() {
       if (eff < minEfficiency) return false
     }
     if (minSponsorRate > 0 && m.sponsorRate < minSponsorRate) return false
-    if (minMinSize > 0 && m.minSize < minMinSize) return false
+    if (maxOrderSize !== null && m.minSize > maxOrderSize) return false
     if (maxVolume !== null && m.volume > maxVolume) return false
     if (maxCurrentSpread !== null) {
       const ob = orderbookMap[m.conditionId]
@@ -308,7 +308,7 @@ export default function RewardsPage() {
     return data.holdingMarkets.filter((m) => !query || m.question.toLowerCase().includes(query))
   }, [data, searchQuery])
 
-  const hasActiveFilters = !!(selectedTag || minYesPrice > 0 || maxYesPrice < 100 || minNoPrice > 0 || maxNoPrice < 100 || minCompetitive > 0 || maxCompetitive < 100 || minTotalRate > 0 || minDailyRate > 0 || minEfficiency > 0 || minSponsorRate > 0 || minMinSize > 0 || maxVolume !== null || maxCurrentSpread !== null || maxEndDate || searchQuery)
+  const hasActiveFilters = !!(selectedTag || minYesPrice > 0 || maxYesPrice < 100 || minNoPrice > 0 || maxNoPrice < 100 || minCompetitive > 0 || maxCompetitive < 100 || minTotalRate > 0 || minDailyRate > 0 || minEfficiency > 0 || minSponsorRate > 0 || maxOrderSize !== null || maxVolume !== null || maxCurrentSpread !== null || maxEndDate || searchQuery)
 
   const tabs: { key: Tab; label: string; count: string }[] = [
     {
@@ -549,10 +549,25 @@ export default function RewardsPage() {
               </div>
 
               <div>
-                <label className="block text-xs text-gray-400 uppercase tracking-wider mb-2">Min Order Size</label>
+                <label className="block text-xs text-gray-400 uppercase tracking-wider mb-2">Max Order Size</label>
                 <div className="flex items-center gap-2">
-                  <RangeSlider min={0} max={maxMinSizeValue} step={1} value={minMinSize} onChange={setMinMinSize} color="#f472b6" />
-                  <input type="number" min={0} max={maxMinSizeValue} value={minMinSize} onChange={(e) => setMinMinSize(Number(e.target.value))} className={numInputClass} />
+                  <RangeSlider
+                    min={0}
+                    max={maxMinSizeValue}
+                    step={1}
+                    value={maxOrderSize ?? maxMinSizeValue}
+                    onChange={(v) => setMaxOrderSize(v >= maxMinSizeValue ? null : v)}
+                    color="#f472b6"
+                    invert
+                  />
+                  <input
+                    type="number"
+                    min={0}
+                    value={maxOrderSize ?? ''}
+                    placeholder="Any"
+                    onChange={(e) => setMaxOrderSize(e.target.value ? Number(e.target.value) : null)}
+                    className={numInputClass}
+                  />
                 </div>
               </div>
 
@@ -719,9 +734,9 @@ export default function RewardsPage() {
                     Efficiency ≥ {minEfficiency.toFixed(2)}%
                   </span>
                 )}
-                {minMinSize > 0 && (
+                {maxOrderSize !== null && (
                   <span className="inline-flex items-center gap-1 px-2 py-1 bg-pink-500/20 text-pink-400 text-xs rounded-full">
-                    Min Size ≥ {minMinSize}
+                    Order Size ≤ {maxOrderSize}
                   </span>
                 )}
                 {maxVolume !== null && (

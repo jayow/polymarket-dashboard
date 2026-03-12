@@ -408,7 +408,7 @@ export default function RewardsTable({ markets, orderbookMap: orderbookProp }: R
           <span>Sorting by:</span>
           {sortColumns.map((s, i) => (
             <span key={s.field} className="inline-flex items-center gap-0.5 px-1.5 py-0.5 bg-polymarket-blue/10 text-polymarket-blue rounded">
-              {i + 1}. {s.field === 'grade' ? 'Grade' : s.field === 'rewardEfficiency' ? 'Efficiency' : s.field === 'totalDailyRate' ? 'Total Rate' : s.field === 'dailyRate' ? 'Native Rate' : s.field === 'sponsorRate' ? 'Sponsor Rate' : s.field === 'maxSpread' ? 'Max Spread' : s.field === 'currentSpread' ? 'Spread' : s.field === 'minSize' ? 'Min Size' : s.field === 'yesPrice' ? 'Yes/No' : s.field === 'endDate' ? 'End Date' : s.field.charAt(0).toUpperCase() + s.field.slice(1)} {s.order === 'asc' ? '↑' : '↓'}
+              {i + 1}. {s.field === 'grade' ? 'Grade' : s.field === 'rewardEfficiency' ? 'Efficiency' : s.field === 'totalDailyRate' ? 'Total Rate' : s.field === 'dailyRate' ? 'Native Rate' : s.field === 'sponsorRate' ? 'Sponsor Rate' : s.field === 'maxSpread' ? 'Max Spread' : s.field === 'currentSpread' ? 'Spread' : s.field === 'minSize' ? 'Order Size' : s.field === 'yesPrice' ? 'Yes/No' : s.field === 'endDate' ? 'End Date' : s.field.charAt(0).toUpperCase() + s.field.slice(1)} {s.order === 'asc' ? '↑' : '↓'}
             </span>
           ))}
           <button
@@ -445,7 +445,7 @@ export default function RewardsTable({ markets, orderbookMap: orderbookProp }: R
               Spread <SortIcon field="currentSpread" />
             </th>
             <th className={thClass} onClick={(e) => handleSort('minSize', e)}>
-              Min Size <SortIcon field="minSize" />
+              Order Size <SortIcon field="minSize" />
             </th>
             <th className={thClass} onClick={(e) => handleSort('yesPrice', e)}>
               Yes / No <SortIcon field="yesPrice" />
