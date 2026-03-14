@@ -232,29 +232,7 @@ function MarketRow({ market, score, orderbook }: {
           )
         })()}
       </td>
-      {/* Strategy */}
-      <td className="p-2">
-        {liveData ? (
-          <div className="text-[11px] leading-relaxed cursor-pointer" onClick={handleRefresh} title="Click to refresh">
-            <div>
-              <span className="text-green-400">Y:{liveData.suggestedYesBid}¢</span>
-              <span className="text-gray-600 mx-1">/</span>
-              <span className="text-red-400">N:{liveData.suggestedNoBid}¢</span>
-              <span className="ml-1 text-[9px] font-semibold text-blue-400">LIVE</span>
-            </div>
-            <div className="text-gray-400">${liveData.capital.toFixed(0)} capital</div>
-          </div>
-        ) : (
-          <div className="text-[11px] leading-relaxed opacity-40">
-            <div>
-              <span className="text-green-400">Y:{staticBids.yesBid}¢</span>
-              <span className="text-gray-700 mx-1">/</span>
-              <span className="text-red-400">N:{staticBids.noBid}¢</span>
-            </div>
-            <div className="text-gray-400">${staticBids.capital.toFixed(0)} capital</div>
-          </div>
-        )}
-      </td>
+      {/* Strategy - hidden for now */}
       {/* Tags */}
       <td className="p-2">
         <div className="flex flex-wrap gap-1">
@@ -465,9 +443,7 @@ export default function RewardsTable({ markets, orderbookMap: orderbookProp }: R
             <th className={thClass} onClick={(e) => handleSort('rewardEfficiency', e)}>
               Efficiency <SortIcon field="rewardEfficiency" />
             </th>
-            <th className={`${thClass} w-[160px]`}>
-              Strategy
-            </th>
+            {/* Strategy column hidden for now */}
             <th className={`${thClass} w-[140px]`}>
               Tags
             </th>
