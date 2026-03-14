@@ -4,6 +4,8 @@ import { SpeedInsights } from '@vercel/speed-insights/next'
 import { Analytics } from '@vercel/analytics/next'
 import GoogleAnalytics from '@/components/GoogleAnalytics'
 import Navigation from '@/components/Navigation'
+import Providers from '@/components/Providers'
+import AuthGate from '@/components/AuthGate'
 import './globals.css'
 
 const inter = Inter({
@@ -26,8 +28,12 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`${inter.variable} font-sans antialiased`}>
-        <Navigation />
-        {children}
+        <Providers>
+          <AuthGate>
+            <Navigation />
+            {children}
+          </AuthGate>
+        </Providers>
         <Analytics />
         <SpeedInsights />
         <GoogleAnalytics measurementId={process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID} />
